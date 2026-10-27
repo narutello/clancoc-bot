@@ -276,6 +276,53 @@ async function notifyBattleStart(bot, war, isCwl = false) {
   await markNotification(warKey, event);
 }
 
+async function notifyOneHourLeft(bot, war, isCwl = false) {
+  const warKey = buildWarKey(war);
+  const event = isCwl ? 'cwl_one_hour_left' : 'one_hour_left';
+  if (await hasNotification(warKey, event)) return;
+
+  const end = parseClashTime(war.endTime);
+  if (!end) return;
+
+  const msLeft = end.getTime() - Date.now();
+  // بین ۵۰ تا ۷۰ دقیقه مانده → یک‌بار اعلام کن
+  const minMs = 50 * 60 * 1000;
+  const maxMs = 70 * 60 * 1000;
+  if (msLeft < minMs || msLeft > maxMs) return;
+
+  const our = war.clan || {};
+  const their = war.opponent || {};
+  const ourName = stripEmojis(our.name || '—') || '—';
+  const oppName = stripEmojis(their.name || '—') || '—';
+
+  const html = `
+    <h2>⏰ ۱ ساعت تا پایان وار</h2>
+
+    <table bordered striped compact>
+      <tr>
+        <th>کلن</th>
+        <th>ستاره</th>
+        <th>تخریب</th>
+      </tr>
+      <tr>
+        <td>🏰 ${escapeHtml(ourName)}</td>
+        <td>${our.stars ?? 0} ⭐</td>
+        <td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td>
+      </tr>
+      <tr>
+        <td>⚡ ${escapeHtml(oppName)}</td>
+        <td>${their.stars ?? 0} ⭐</td>
+        <td>${(their.destructionPercentage ?? 0).toFixed(1)}%</td>
+      </tr>
+    </table>
+
+    <p>حمله‌هاتون رو فراموش نکنید.</p>
+  `.trim();
+
+  await sendToGroup(bot, html);
+  await markNotification(warKey, event);
+}
+
 async function notifyWarEnded(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_war_ended' : 'war_ended';
@@ -323,6 +370,7 @@ async function checkRegularWar(bot) {
   if (war.state === 'inWar') {
     await notifyOpponentFound(bot, war, false);
     await notifyBattleStart(bot, war, false);
+    await notifyOneHourLeft(bot, war, false);
   }
 
   if (war.state === 'warEnded') {
@@ -391,6 +439,7 @@ async function checkCwl(bot) {
         if (war.state === 'inWar') {
           await notifyOpponentFound(bot, war, true);
           await notifyBattleStart(bot, war, true);
+          await notifyOneHourLeft(bot, war, true);
         }
         if (war.state === 'warEnded') {
           await notifyWarEnded(bot, war, true);
