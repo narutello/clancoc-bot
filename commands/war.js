@@ -108,6 +108,7 @@ module.exports = async function warCommand(ctx) {
       </table>
 
       <p>
+        👥 ${teamSize}v${teamSize}<br/>
         ⏳ وضعیت: <b>${escapeHtml(warStateLabel(war.state))}</b>
       </p>
 
