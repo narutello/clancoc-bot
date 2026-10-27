@@ -39,7 +39,9 @@ module.exports = async function warCommand(ctx) {
     // زمان شروع / پایان
     let timeInfo = '';
     if (war.state === 'preparation') {
-      const start = parseClashTime(war.startTime);
+      const start =
+        parseClashTime(war.startTime) ||
+        parseClashTime(war.preparationStartTime);
       const formatted = formatWarTime(start);
       if (formatted) {
         timeInfo = `<p>🕐 شروع نبرد: <b>${formatted}</b></p>`;

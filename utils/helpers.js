@@ -39,7 +39,15 @@ function formatDuration(ms) {
 function parseClashTime(iso) {
   if (!iso) return null;
   try {
-    return new Date(iso);
+    // فرمت Clash: 20241027T183000.000Z → باید به ISO استاندارد تبدیل شود
+    let s = String(iso).trim();
+    // 20241027T183000.000Z
+    const m = s.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?:\.\d+)?Z?$/);
+    if (m) {
+      s = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}.000Z`;
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
   } catch {
     return null;
   }
