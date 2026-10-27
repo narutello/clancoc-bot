@@ -1,3 +1,4 @@
+const http = require('http');
 const config = require('./config');
 const { createBot } = require('./bot');
 const { migrate } = require('./database/migrate');
@@ -26,6 +27,17 @@ async function main() {
     process.exit(1);
   }
 
+  // Health-check server for Inject Cloud / hosting platforms
+  const port = process.env.PORT || 3000;
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('ClanCoC Bot is running');
+  });
+
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`[OK] Health server listening on port ${port}`);
+  });
+
   const bot = createBot();
 
   // Launch bot
@@ -50,6 +62,7 @@ async function main() {
   const stop = async (signal) => {
     console.log(`\nReceived ${signal}, shutting down...`);
     bot.stop(signal);
+    server.close();
     await pool.end();
     process.exit(0);
   };
