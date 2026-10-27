@@ -79,14 +79,13 @@ module.exports = async function warCommand(ctx) {
           <td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td>
         </tr>
         <tr>
-          <td>🆚 ${escapeHtml(opp.name || '—')}</td>
+          <td>⚡ ${escapeHtml(opp.name || '—')}</td>
           <td>${opp.stars ?? 0} ⭐</td>
           <td>${(opp.destructionPercentage ?? 0).toFixed(1)}%</td>
         </tr>
       </table>
 
       <p>
-        👥 ${teamSize}v${teamSize}<br/>
         ⏳ وضعیت: <b>${escapeHtml(warStateLabel(war.state))}</b>
       </p>
 
