@@ -3,7 +3,6 @@ const {
   getCurrentWar,
   getCurrentWarLeagueGroup,
   getCwlWar,
-  getClan,
 } = require('../api/clash');
 const { getLinksForTags } = require('./linkService');
 const {
@@ -14,6 +13,8 @@ const {
   parseClashTime,
   formatTag,
   normalizeTag,
+  stripEmojis,
+  formatWarTime,
 } = require('../utils/helpers');
 const config = require('../config');
 
@@ -105,46 +106,133 @@ function countAttacks(members) {
   return used;
 }
 
-async function formatMembersList(members) {
-  if (!members || members.length === 0) return '—';
+/** ساخت جدول اعضا برای Rich Message */
+async function buildMembersTableRows(members) {
+  if (!members || members.length === 0) return '';
 
   const tags = members.map((m) => m.tag);
   const linksMap = await getLinksForTags(tags);
 
-  const lines = members
+  return members
+    .slice()
     .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0))
-    .map((m, idx) => {
+    .map((m) => {
+      const attacks = m.attacks || [];
+      const stars = attacks.reduce((sum, a) => sum + (a.stars || 0), 0);
       const links = linksMap.get(m.tag) || [];
-      const name = escapeHtml(m.name || formatTag(m.tag));
 
-      if (links.length === 0) {
-        // فقط اسم، بدون هیچ متن اضافی
-        return `${idx + 1}. ${name}`;
+      let nameCell;
+      if (links.length > 0) {
+        nameCell = links
+          .map((u) => tgUserLink(u.telegram_id, m.name))
+          .join(' / ');
+      } else {
+        nameCell = escapeHtml(m.name || formatTag(m.tag));
       }
 
-      // اسم قابل کلیک + تیک سبز
-      const linkedNames = links
-        .map((u) => tgUserLink(u.telegram_id, m.name))
-        .join(' / ');
-
-      return `${idx + 1}. ${linkedNames} ✅`;
-    });
-
-  return lines.join('\n');
+      return `
+        <tr>
+          <td>${m.mapPosition ?? '—'}</td>
+          <td>${nameCell}</td>
+          <td>${attacks.length}</td>
+          <td>${stars} ⭐</td>
+        </tr>
+      `;
+    })
+    .join('');
 }
 
-async function sendToGroup(bot, text) {
+/** ساخت HTML کامل وضعیت وار (مثل /war) */
+async function buildWarRichHtml(war, title, extraHtml = '') {
+  const our = war.clan || {};
+  const opp = war.opponent || {};
+  const members = extractMembers(war);
+  const teamSize = war.teamSize || members.length || '?';
+
+  const ourName = stripEmojis(our.name || '—') || '—';
+  const oppName = stripEmojis(opp.name || '—') || '—';
+
+  let timeInfo = '';
+  if (war.state === 'preparation') {
+    const start =
+      parseClashTime(war.startTime) || parseClashTime(war.preparationStartTime);
+    const formatted = formatWarTime(start);
+    if (formatted) timeInfo = `<p>🕐 شروع نبرد: <b>${formatted}</b></p>`;
+  } else if (war.state === 'inWar') {
+    const end = parseClashTime(war.endTime);
+    const formatted = formatWarTime(end);
+    if (formatted) timeInfo = `<p>🕐 پایان وار: <b>${formatted}</b></p>`;
+  }
+
+  const rows = await buildMembersTableRows(members);
+
+  return `
+    <h2>${title}</h2>
+
+    <table bordered striped compact>
+      <tr>
+        <th>کلن</th>
+        <th>ستاره</th>
+        <th>تخریب</th>
+      </tr>
+      <tr>
+        <td>🏰 ${escapeHtml(ourName)}</td>
+        <td>${our.stars ?? 0} ⭐</td>
+        <td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td>
+      </tr>
+      <tr>
+        <td>⚡ ${escapeHtml(oppName)}</td>
+        <td>${opp.stars ?? 0} ⭐</td>
+        <td>${(opp.destructionPercentage ?? 0).toFixed(1)}%</td>
+      </tr>
+    </table>
+
+    <p>
+      👥 ${teamSize}v${teamSize}<br/>
+      ⏳ وضعیت: <b>${escapeHtml(warStateLabel(war.state))}</b>
+    </p>
+
+    ${timeInfo}
+    ${extraHtml}
+
+    <h3>📋 اعضای وار</h3>
+
+    <table bordered striped compact>
+      <tr>
+        <th>#</th>
+        <th>بازیکن</th>
+        <th>حمله</th>
+        <th>ستاره</th>
+      </tr>
+      ${rows}
+    </table>
+  `.trim();
+}
+
+async function sendToGroup(bot, html) {
   if (!config.telegramGroupId) {
     console.warn('[WarMonitor] TELEGRAM_GROUP_ID not set, skipping notification');
     return;
   }
   try {
-    await bot.telegram.sendMessage(config.telegramGroupId, text, {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
+    await bot.telegram.callApi('sendRichMessage', {
+      chat_id: config.telegramGroupId,
+      rich_message: {
+        html,
+        is_rtl: true,
+      },
     });
   } catch (err) {
-    console.error('[WarMonitor] Failed to send group message:', err.message);
+    console.error('[WarMonitor] Failed to send rich message:', err.message);
+    try {
+      await bot.telegram.sendMessage(
+        config.telegramGroupId,
+        'اعلان وار (نسخه کلاینت از Rich Message پشتیبانی نمی‌کند)',
+        { disable_web_page_preview: true }
+      );
+    } catch (e2) {
+      console.error('[WarMonitor] Fallback also failed:', e2.message);
+    }
   }
 }
 
@@ -153,26 +241,9 @@ async function notifyOpponentFound(bot, war, isCwl = false) {
   const event = isCwl ? 'cwl_opponent_found' : 'opponent_found';
   if (await hasNotification(warKey, event)) return;
 
-  const ourClan = war.clan || {};
-  const opp = war.opponent || {};
-  const members = extractMembers(war);
-  const membersList = await formatMembersList(members);
-  const teamSize = war.teamSize || members.length || '?';
-
-  const text = `
-⚔️ <b>حریف وار پیدا شد!</b>${isCwl ? ' (CWL)' : ''}
-
-<code>🏰 ${escapeHtml(ourClan.name || '—')}
-🆚 ${escapeHtml(opp.name || '—')} (${formatTag(opp.tag)})</code>
-
-👥 نوع وار: ${teamSize}v${teamSize}
-⏳ وضعیت: ${warStateLabel(war.state)}
-
-📋 <b>اعضای شرکت‌کننده در وار:</b>
-${membersList}
-`.trim();
-
-  await sendToGroup(bot, text);
+  const title = `⚔️ حریف وار پیدا شد!${isCwl ? ' (CWL)' : ''}`;
+  const html = await buildWarRichHtml(war, title);
+  await sendToGroup(bot, html);
   await markNotification(warKey, event);
 }
 
@@ -181,14 +252,9 @@ async function notifyPreparation(bot, war, isCwl = false) {
   const event = isCwl ? 'cwl_preparation' : 'preparation';
   if (await hasNotification(warKey, event)) return;
 
-  const text = `
-⏳ <b>مرحله آماده‌سازی وار شروع شد!</b>${isCwl ? ' (CWL)' : ''}
-
-🏰 ${escapeHtml(war.clan?.name || '')} vs ${escapeHtml(war.opponent?.name || '')}
-📅 شروع نبرد: ${war.startTime ? new Date(war.startTime).toLocaleString('fa-IR') : '—'}
-`.trim();
-
-  await sendToGroup(bot, text);
+  const title = `⏳ مرحله آماده‌سازی شروع شد!${isCwl ? ' (CWL)' : ''}`;
+  const html = await buildWarRichHtml(war, title);
+  await sendToGroup(bot, html);
   await markNotification(warKey, event);
 }
 
@@ -197,38 +263,15 @@ async function notifyBattleStart(bot, war, isCwl = false) {
   const event = isCwl ? 'cwl_battle_start' : 'battle_start';
   if (await hasNotification(warKey, event)) return;
 
-  const our = war.clan || {};
-  const their = war.opponent || {};
   const members = extractMembers(war);
   const attacksUsed = countAttacks(members);
-  const maxAttacks = (war.teamSize || members.length) * (war.attacksPerMember || 2);
-  const notAttacked = members.filter((m) => (m.attacks || []).length === 0);
+  const maxAttacks =
+    (war.teamSize || members.length) * (war.attacksPerMember || 2);
 
-  let notAttackedText = 'همه حمله کرده‌اند ✅';
-  if (notAttacked.length > 0) {
-    const linksMap = await getLinksForTags(notAttacked.map((m) => m.tag));
-    notAttackedText = notAttacked
-      .map((m) => {
-        const links = linksMap.get(m.tag) || [];
-        if (links.length > 0) {
-          return links.map((u) => tgUserLink(u.telegram_id, m.name)).join(' / ');
-        }
-        return escapeHtml(m.name);
-      })
-      .join('، ');
-  }
-
-  const text = `
-🔥 <b>روز نبرد شروع شد!</b>${isCwl ? ' (CWL)' : ''}
-
-<code>🏰 ${escapeHtml(our.name || '—')}  ${our.stars ?? 0}⭐  ${(our.destructionPercentage ?? 0).toFixed(1)}%
-🆚 ${escapeHtml(their.name || '—')}  ${their.stars ?? 0}⭐  ${(their.destructionPercentage ?? 0).toFixed(1)}%</code>
-
-⚔️ حمله‌های استفاده‌شده: ${attacksUsed} / ${maxAttacks}
-👥 هنوز حمله نکرده‌اند: ${notAttackedText}
-`.trim();
-
-  await sendToGroup(bot, text);
+  const extra = `<p>⚔️ حمله‌ها: <b>${attacksUsed}/${maxAttacks}</b></p>`;
+  const title = `🔥 روز نبرد شروع شد!${isCwl ? ' (CWL)' : ''}`;
+  const html = await buildWarRichHtml(war, title, extra);
+  await sendToGroup(bot, html);
   await markNotification(warKey, event);
 }
 
@@ -242,19 +285,15 @@ async function notifyWarEnded(bot, war, isCwl = false) {
   let result = 'tie';
   if ((our.stars || 0) > (their.stars || 0)) result = 'win';
   else if ((our.stars || 0) < (their.stars || 0)) result = 'lose';
-  else if ((our.destructionPercentage || 0) > (their.destructionPercentage || 0)) result = 'win';
-  else if ((our.destructionPercentage || 0) < (their.destructionPercentage || 0)) result = 'lose';
+  else if ((our.destructionPercentage || 0) > (their.destructionPercentage || 0))
+    result = 'win';
+  else if ((our.destructionPercentage || 0) < (their.destructionPercentage || 0))
+    result = 'lose';
 
-  const text = `
-🏁 <b>وار به پایان رسید!</b>${isCwl ? ' (CWL)' : ''}
-
-<code>🏰 ${escapeHtml(our.name || '—')}  ${our.stars ?? 0}⭐  ${(our.destructionPercentage ?? 0).toFixed(1)}%
-🆚 ${escapeHtml(their.name || '—')}  ${their.stars ?? 0}⭐  ${(their.destructionPercentage ?? 0).toFixed(1)}%</code>
-
-نتیجه: ${resultLabel(result)}
-`.trim();
-
-  await sendToGroup(bot, text);
+  const extra = `<p>نتیجه: <b>${resultLabel(result)}</b></p>`;
+  const title = `🏁 وار به پایان رسید!${isCwl ? ' (CWL)' : ''}`;
+  const html = await buildWarRichHtml(war, title, extra);
+  await sendToGroup(bot, html);
   await markNotification(warKey, event);
 }
 
@@ -294,7 +333,9 @@ async function checkRegularWar(bot) {
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
     teamSize: war.teamSize,
-    preparationStart: war.preparationStartTime ? new Date(war.preparationStartTime) : null,
+    preparationStart: war.preparationStartTime
+      ? new Date(war.preparationStartTime)
+      : null,
     startTime: war.startTime ? new Date(war.startTime) : null,
     endTime: war.endTime ? new Date(war.endTime) : null,
     ourStars: war.clan?.stars,
@@ -329,12 +370,8 @@ async function checkCwl(bot) {
       if (warTag === '#0' || !warTag) continue;
       try {
         const war = await getCwlWar(warTag);
-        const clan1 = war.clan || {};
-        const clan2 = war.opponent || {};
 
         const isOurWar =
-          normalizeTag(clan1.tag) === ourTag ||
-          normalizeTag(clan2.tag) === ourTag ||
           normalizeTag(war.clan?.tag) === ourTag ||
           normalizeTag(war.opponent?.tag) === ourTag;
 
@@ -379,12 +416,8 @@ async function checkCwl(bot) {
 
 async function checkWarStatus(bot) {
   try {
-    const regular = await checkRegularWar(bot);
-    const cwl = await checkCwl(bot);
-
-    if ((!regular || regular.state === 'notInWar') && !cwl) {
-      // Idle
-    }
+    await checkRegularWar(bot);
+    await checkCwl(bot);
   } catch (err) {
     console.error('[WarMonitor] Error during check:', err.message);
   }
@@ -395,7 +428,10 @@ function startWarMonitor(bot) {
 
   setTimeout(() => checkWarStatus(bot), 5000);
 
-  const interval = setInterval(() => checkWarStatus(bot), config.warPollIntervalMs);
+  const interval = setInterval(
+    () => checkWarStatus(bot),
+    config.warPollIntervalMs
+  );
 
   if (global.__warMonitorInterval) {
     clearInterval(global.__warMonitorInterval);
@@ -403,6 +439,24 @@ function startWarMonitor(bot) {
   global.__warMonitorInterval = interval;
 
   return interval;
+}
+
+async function formatMembersList(members) {
+  if (!members || members.length === 0) return '—';
+  const tags = members.map((m) => m.tag);
+  const linksMap = await getLinksForTags(tags);
+  return members
+    .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0))
+    .map((m, idx) => {
+      const links = linksMap.get(m.tag) || [];
+      const name = escapeHtml(m.name || formatTag(m.tag));
+      if (links.length === 0) return `${idx + 1}. ${name}`;
+      const linkedNames = links
+        .map((u) => tgUserLink(u.telegram_id, m.name))
+        .join(' / ');
+      return `${idx + 1}. ${linkedNames} ✅`;
+    })
+    .join('\n');
 }
 
 module.exports = {
