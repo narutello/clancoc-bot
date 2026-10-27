@@ -45,6 +45,70 @@ function parseClashTime(iso) {
   }
 }
 
+/** حذف ایموجی از اسم کلن */
+function stripEmojis(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(
+      /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2300}-\u{23FF}]|[\u{2B50}]|[\u{203C}-\u{3299}]/gu,
+      ''
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * فرمت زمان وار به فارسی خوانا
+ * مثال:
+ * - امروز ساعت ۱۴:۳۰
+ * - فردا ساعت ۰۸:۰۰
+ * - سه‌شنبه ساعت ۲۱:۱۵
+ */
+function formatWarTime(date) {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+
+  const options = {
+    timeZone: 'Asia/Tehran',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  };
+
+  const timeStr = date.toLocaleTimeString('fa-IR', options);
+
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const isSameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const dateTehran = new Date(
+    date.toLocaleString('en-US', { timeZone: 'Asia/Tehran' })
+  );
+  const todayTehran = new Date(
+    today.toLocaleString('en-US', { timeZone: 'Asia/Tehran' })
+  );
+  const tomorrowTehran = new Date(
+    tomorrow.toLocaleString('en-US', { timeZone: 'Asia/Tehran' })
+  );
+
+  if (isSameDay(dateTehran, todayTehran)) {
+    return `امروز ساعت ${timeStr}`;
+  }
+  if (isSameDay(dateTehran, tomorrowTehran)) {
+    return `فردا ساعت ${timeStr}`;
+  }
+
+  const weekday = date.toLocaleDateString('fa-IR', {
+    timeZone: 'Asia/Tehran',
+    weekday: 'long',
+  });
+  return `${weekday} ساعت ${timeStr}`;
+}
+
 function warStateLabel(state) {
   const map = {
     notInWar: 'خارج از وار',
@@ -70,6 +134,8 @@ module.exports = {
   tgUserLink,
   formatDuration,
   parseClashTime,
+  stripEmojis,
+  formatWarTime,
   warStateLabel,
   resultLabel,
 };

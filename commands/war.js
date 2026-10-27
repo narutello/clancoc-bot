@@ -5,6 +5,9 @@ const {
   warStateLabel,
   normalizeTag,
   tgUserLink,
+  stripEmojis,
+  formatWarTime,
+  parseClashTime,
 } = require('../utils/helpers');
 
 module.exports = async function warCommand(ctx) {
@@ -32,6 +35,22 @@ module.exports = async function warCommand(ctx) {
       war.state === 'inWar' || war.state === 'warEnded'
         ? `<p>⚔️ حمله‌ها: <b>${used}/${max}</b></p>`
         : '';
+
+    // زمان شروع / پایان
+    let timeInfo = '';
+    if (war.state === 'preparation') {
+      const start = parseClashTime(war.startTime);
+      const formatted = formatWarTime(start);
+      if (formatted) {
+        timeInfo = `<p>🕐 شروع نبرد: <b>${formatted}</b></p>`;
+      }
+    } else if (war.state === 'inWar') {
+      const end = parseClashTime(war.endTime);
+      const formatted = formatWarTime(end);
+      if (formatted) {
+        timeInfo = `<p>🕐 پایان وار: <b>${formatted}</b></p>`;
+      }
+    }
 
     // لینک‌های تلگرام اعضا
     const tags = members.map((m) => normalizeTag(m.tag));
@@ -64,6 +83,9 @@ module.exports = async function warCommand(ctx) {
       })
       .join('');
 
+    const ourName = stripEmojis(our.name || '—') || '—';
+    const oppName = stripEmojis(opp.name || '—') || '—';
+
     const html = `
       <h2>⚔️ وضعیت وار</h2>
 
@@ -74,12 +96,12 @@ module.exports = async function warCommand(ctx) {
           <th>تخریب</th>
         </tr>
         <tr>
-          <td>🏰 ${escapeHtml(our.name || '—')}</td>
+          <td>🏰 ${escapeHtml(ourName)}</td>
           <td>${our.stars ?? 0} ⭐</td>
           <td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td>
         </tr>
         <tr>
-          <td>⚡ ${escapeHtml(opp.name || '—')}</td>
+          <td>⚡ ${escapeHtml(oppName)}</td>
           <td>${opp.stars ?? 0} ⭐</td>
           <td>${(opp.destructionPercentage ?? 0).toFixed(1)}%</td>
         </tr>
@@ -89,6 +111,7 @@ module.exports = async function warCommand(ctx) {
         ⏳ وضعیت: <b>${escapeHtml(warStateLabel(war.state))}</b>
       </p>
 
+      ${timeInfo}
       ${attacksInfo}
 
       <h3>📋 اعضای وار</h3>
