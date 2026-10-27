@@ -118,19 +118,17 @@ async function formatMembersList(members) {
       const name = escapeHtml(m.name || formatTag(m.tag));
 
       if (links.length === 0) {
-        return `${idx + 1}. ${name} — ⚠️ لینک نشده`;
+        // فقط اسم، بدون هیچ متن اضافی
+        return `${idx + 1}. ${name}`;
       }
 
+      // اسم قابل کلیک + تیک سبز
       const linkedNames = links
         .map((u) => tgUserLink(u.telegram_id, m.name))
         .join(' / ');
 
-      return `${idx + 1}. ${linkedNames} — ✅ لینک شده`;
+      return `${idx + 1}. ${linkedNames} ✅`;
     });
-
-  const linkedCount = members.filter((m) => (linksMap.get(m.tag) || []).length > 0).length;
-  lines.push('');
-  lines.push(`🔗 وضعیت لینک‌ها: ${linkedCount} از ${members.length} عضو لینک شده‌اند.`);
 
   return lines.join('\n');
 }
@@ -164,13 +162,13 @@ async function notifyOpponentFound(bot, war, isCwl = false) {
   const text = `
 ⚔️ <b>حریف وار پیدا شد!</b>${isCwl ? ' (CWL)' : ''}
 
-🏰 کلن ما: <b>${escapeHtml(ourClan.name || '—')}</b>
-🆚 کلن حریف: <b>${escapeHtml(opp.name || '—')}</b> (${formatTag(opp.tag)})
+<code>🏰 ${escapeHtml(ourClan.name || '—')}
+🆚 ${escapeHtml(opp.name || '—')} (${formatTag(opp.tag)})</code>
+
 👥 نوع وار: ${teamSize}v${teamSize}
 ⏳ وضعیت: ${warStateLabel(war.state)}
 
 📋 <b>اعضای شرکت‌کننده در وار:</b>
-
 ${membersList}
 `.trim();
 
@@ -223,8 +221,8 @@ async function notifyBattleStart(bot, war, isCwl = false) {
   const text = `
 🔥 <b>روز نبرد شروع شد!</b>${isCwl ? ' (CWL)' : ''}
 
-🏰 ${escapeHtml(our.name)}  ${our.stars ?? 0}⭐ (${(our.destructionPercentage ?? 0).toFixed(1)}%)
-🆚 ${escapeHtml(their.name)}  ${their.stars ?? 0}⭐ (${(their.destructionPercentage ?? 0).toFixed(1)}%)
+<code>🏰 ${escapeHtml(our.name || '—')}  ${our.stars ?? 0}⭐  ${(our.destructionPercentage ?? 0).toFixed(1)}%
+🆚 ${escapeHtml(their.name || '—')}  ${their.stars ?? 0}⭐  ${(their.destructionPercentage ?? 0).toFixed(1)}%</code>
 
 ⚔️ حمله‌های استفاده‌شده: ${attacksUsed} / ${maxAttacks}
 👥 هنوز حمله نکرده‌اند: ${notAttackedText}
@@ -250,8 +248,8 @@ async function notifyWarEnded(bot, war, isCwl = false) {
   const text = `
 🏁 <b>وار به پایان رسید!</b>${isCwl ? ' (CWL)' : ''}
 
-🏰 ${escapeHtml(our.name)}  ${our.stars ?? 0}⭐ (${(our.destructionPercentage ?? 0).toFixed(1)}%)
-🆚 ${escapeHtml(their.name)}  ${their.stars ?? 0}⭐ (${(their.destructionPercentage ?? 0).toFixed(1)}%)
+<code>🏰 ${escapeHtml(our.name || '—')}  ${our.stars ?? 0}⭐  ${(our.destructionPercentage ?? 0).toFixed(1)}%
+🆚 ${escapeHtml(their.name || '—')}  ${their.stars ?? 0}⭐  ${(their.destructionPercentage ?? 0).toFixed(1)}%</code>
 
 نتیجه: ${resultLabel(result)}
 `.trim();

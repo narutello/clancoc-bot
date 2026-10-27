@@ -38,8 +38,8 @@ module.exports = async function warCommand(ctx) {
     const text = `
 ⚔️ <b>وضعیت وار</b>
 
-🏰 ${escapeHtml(our.name || '—')}  ${our.stars ?? 0}⭐ (${(our.destructionPercentage ?? 0).toFixed(1)}%)
-🆚 ${escapeHtml(opp.name || '—')}  ${opp.stars ?? 0}⭐ (${(opp.destructionPercentage ?? 0).toFixed(1)}%)
+<code>🏰 ${escapeHtml(our.name || '—')}  ${our.stars ?? 0}⭐  ${(our.destructionPercentage ?? 0).toFixed(1)}%
+🆚 ${escapeHtml(opp.name || '—')}  ${opp.stars ?? 0}⭐  ${(opp.destructionPercentage ?? 0).toFixed(1)}%</code>
 
 👥 ${teamSize}v${teamSize}
 ⏳ وضعیت: ${warStateLabel(war.state)}${attacksInfo}
