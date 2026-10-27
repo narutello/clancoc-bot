@@ -46,7 +46,6 @@ module.exports = async function warCommand(ctx) {
 
         let nameCell;
         if (links.length > 0) {
-          // اسم قابل کلیک
           nameCell = links
             .map((u) => tgUserLink(u.telegram_id, member.name))
             .join(' / ');
@@ -68,17 +67,23 @@ module.exports = async function warCommand(ctx) {
     const html = `
       <h2>⚔️ وضعیت وار</h2>
 
-      <p>
-        🏰 <b>${escapeHtml(our.name || '—')}</b>
-        — ${our.stars ?? 0} ⭐
-        (${(our.destructionPercentage ?? 0).toFixed(1)}%)
-      </p>
-
-      <p>
-        🆚 <b>${escapeHtml(opp.name || '—')}</b>
-        — ${opp.stars ?? 0} ⭐
-        (${(opp.destructionPercentage ?? 0).toFixed(1)}%)
-      </p>
+      <table bordered striped compact>
+        <tr>
+          <th>کلن</th>
+          <th>ستاره</th>
+          <th>تخریب</th>
+        </tr>
+        <tr>
+          <td>🏰 ${escapeHtml(our.name || '—')}</td>
+          <td>${our.stars ?? 0} ⭐</td>
+          <td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td>
+        </tr>
+        <tr>
+          <td>🆚 ${escapeHtml(opp.name || '—')}</td>
+          <td>${opp.stars ?? 0} ⭐</td>
+          <td>${(opp.destructionPercentage ?? 0).toFixed(1)}%</td>
+        </tr>
+      </table>
 
       <p>
         👥 ${teamSize}v${teamSize}<br/>
@@ -87,7 +92,7 @@ module.exports = async function warCommand(ctx) {
 
       ${attacksInfo}
 
-      <h3>📋 اعضای کلن</h3>
+      <h3>📋 اعضای وار</h3>
 
       <table bordered striped compact>
         <tr>
@@ -100,7 +105,6 @@ module.exports = async function warCommand(ctx) {
       </table>
     `.trim();
 
-    // استفاده از Rich Message (Bot API 10.1+)
     return ctx.telegram.callApi('sendRichMessage', {
       chat_id: ctx.chat.id,
       rich_message: {
@@ -111,7 +115,6 @@ module.exports = async function warCommand(ctx) {
   } catch (err) {
     console.error('[/war]', err.message);
 
-    // اگر Rich Message پشتیبانی نشد، پیام مناسب بده
     if (
       err.description?.includes('sendRichMessage') ||
       err.message?.includes('sendRichMessage') ||
