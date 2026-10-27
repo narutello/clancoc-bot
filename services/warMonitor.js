@@ -106,7 +106,6 @@ function countAttacks(members) {
   return used;
 }
 
-/** ساخت جدول اعضا برای Rich Message */
 async function buildMembersTableRows(members) {
   if (!members || members.length === 0) return '';
 
@@ -119,6 +118,7 @@ async function buildMembersTableRows(members) {
     .map((m) => {
       const attacks = m.attacks || [];
       const stars = attacks.reduce((sum, a) => sum + (a.stars || 0), 0);
+      const defStars = m.bestOpponentAttack?.stars ?? 0;
       const links = linksMap.get(m.tag) || [];
 
       let nameCell;
@@ -136,13 +136,13 @@ async function buildMembersTableRows(members) {
           <td>${nameCell}</td>
           <td>${attacks.length}</td>
           <td>${stars} ⭐</td>
+          <td>${defStars} ⭐</td>
         </tr>
       `;
     })
     .join('');
 }
 
-/** ساخت HTML کامل وضعیت وار (مثل /war) */
 async function buildWarRichHtml(war, title, extraHtml = '') {
   const our = war.clan || {};
   const opp = war.opponent || {};
@@ -203,6 +203,7 @@ async function buildWarRichHtml(war, title, extraHtml = '') {
         <th>بازیکن</th>
         <th>حمله</th>
         <th>ستاره</th>
+        <th>دفاع</th>
       </tr>
       ${rows}
     </table>

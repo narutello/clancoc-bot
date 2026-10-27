@@ -22,7 +22,10 @@ module.exports = async function warCommand(ctx) {
     const opp = war.opponent || {};
     const members = (our.members || []).slice().sort(
       (a, b) => (a.mapPosition || 0) - (b.mapPosition || 0)
-    );
+    ).map((m) => ({
+      ...m,
+      bestOpponentAttack: m.bestOpponentAttack || null,
+    }));
     const teamSize = war.teamSize || members.length;
 
     const used = members.reduce(
@@ -62,6 +65,7 @@ module.exports = async function warCommand(ctx) {
       .map((member) => {
         const attacks = member.attacks || [];
         const stars = attacks.reduce((sum, a) => sum + (a.stars || 0), 0);
+        const defStars = member.bestOpponentAttack?.stars ?? 0;
         const tag = normalizeTag(member.tag);
         const links = linksMap.get(tag) || [];
 
@@ -80,6 +84,7 @@ module.exports = async function warCommand(ctx) {
             <td>${nameCell}</td>
             <td>${attacks.length}</td>
             <td>${stars} ⭐</td>
+            <td>${defStars} ⭐</td>
           </tr>
         `;
       })
@@ -125,6 +130,7 @@ module.exports = async function warCommand(ctx) {
           <th>بازیکن</th>
           <th>حمله</th>
           <th>ستاره</th>
+          <th>دفاع</th>
         </tr>
         ${rows}
       </table>
