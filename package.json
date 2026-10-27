@@ -1,0 +1,28 @@
+{
+  "name": "clancoc-bot",
+  "version": "1.0.0",
+  "description": "Professional Telegram bot for Clash of Clans war management",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "db:migrate": "node database/migrate.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "pg": "^8.13.0",
+    "telegraf": "^4.16.3"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "clash-of-clans",
+    "war",
+    "cwl"
+  ],
+  "author": "Sajad",
+  "license": "MIT"
+}
