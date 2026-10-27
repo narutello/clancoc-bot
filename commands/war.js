@@ -1,12 +1,11 @@
 const { getCurrentWar } = require('../api/clash');
-const { formatMembersList } = require('../services/warMonitor');
+const { getLinksForTags } = require('../services/linkService');
 const {
   escapeHtml,
   warStateLabel,
-  formatTag,
   normalizeTag,
+  tgUserLink,
 } = require('../utils/helpers');
-const config = require('../config');
 
 module.exports = async function warCommand(ctx) {
   try {
@@ -18,39 +17,111 @@ module.exports = async function warCommand(ctx) {
 
     const our = war.clan || {};
     const opp = war.opponent || {};
-    const members = (our.members || []).map((m) => ({
-      tag: normalizeTag(m.tag),
-      name: m.name,
-      mapPosition: m.mapPosition,
-      attacks: m.attacks || [],
-    }));
-
-    const membersList = await formatMembersList(members);
+    const members = (our.members || []).slice().sort(
+      (a, b) => (a.mapPosition || 0) - (b.mapPosition || 0)
+    );
     const teamSize = war.teamSize || members.length;
 
-    let attacksInfo = '';
-    if (war.state === 'inWar' || war.state === 'warEnded') {
-      const used = members.reduce((s, m) => s + (m.attacks || []).length, 0);
-      const max = teamSize * (war.attacksPerMember || 2);
-      attacksInfo = `\n⚔️ حمله‌ها: ${used}/${max}`;
-    }
+    const used = members.reduce(
+      (sum, m) => sum + (m.attacks || []).length,
+      0
+    );
+    const max = teamSize * (war.attacksPerMember || 2);
 
-    const text = `
-⚔️ <b>وضعیت وار</b>
+    const attacksInfo =
+      war.state === 'inWar' || war.state === 'warEnded'
+        ? `<p>⚔️ حمله‌ها: <b>${used}/${max}</b></p>`
+        : '';
 
-<code>🏰 ${escapeHtml(our.name || '—')}  ${our.stars ?? 0}⭐  ${(our.destructionPercentage ?? 0).toFixed(1)}%
-🆚 ${escapeHtml(opp.name || '—')}  ${opp.stars ?? 0}⭐  ${(opp.destructionPercentage ?? 0).toFixed(1)}%</code>
+    // لینک‌های تلگرام اعضا
+    const tags = members.map((m) => normalizeTag(m.tag));
+    const linksMap = await getLinksForTags(tags);
 
-👥 ${teamSize}v${teamSize}
-⏳ وضعیت: ${warStateLabel(war.state)}${attacksInfo}
+    const rows = members
+      .map((member) => {
+        const attacks = member.attacks || [];
+        const stars = attacks.reduce((sum, a) => sum + (a.stars || 0), 0);
+        const tag = normalizeTag(member.tag);
+        const links = linksMap.get(tag) || [];
 
-📋 <b>اعضا:</b>
-${membersList}
-`.trim();
+        let nameCell;
+        if (links.length > 0) {
+          // اسم قابل کلیک
+          nameCell = links
+            .map((u) => tgUserLink(u.telegram_id, member.name))
+            .join(' / ');
+        } else {
+          nameCell = escapeHtml(member.name || '—');
+        }
 
-    return ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
+        return `
+          <tr>
+            <td>${member.mapPosition ?? '—'}</td>
+            <td>${nameCell}</td>
+            <td>${attacks.length}</td>
+            <td>${stars} ⭐</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const html = `
+      <h2>⚔️ وضعیت وار</h2>
+
+      <p>
+        🏰 <b>${escapeHtml(our.name || '—')}</b>
+        — ${our.stars ?? 0} ⭐
+        (${(our.destructionPercentage ?? 0).toFixed(1)}%)
+      </p>
+
+      <p>
+        🆚 <b>${escapeHtml(opp.name || '—')}</b>
+        — ${opp.stars ?? 0} ⭐
+        (${(opp.destructionPercentage ?? 0).toFixed(1)}%)
+      </p>
+
+      <p>
+        👥 ${teamSize}v${teamSize}<br/>
+        ⏳ وضعیت: <b>${escapeHtml(warStateLabel(war.state))}</b>
+      </p>
+
+      ${attacksInfo}
+
+      <h3>📋 اعضای کلن</h3>
+
+      <table bordered striped compact>
+        <tr>
+          <th>#</th>
+          <th>بازیکن</th>
+          <th>حمله</th>
+          <th>ستاره</th>
+        </tr>
+        ${rows}
+      </table>
+    `.trim();
+
+    // استفاده از Rich Message (Bot API 10.1+)
+    return ctx.telegram.callApi('sendRichMessage', {
+      chat_id: ctx.chat.id,
+      rich_message: {
+        html,
+        is_rtl: true,
+      },
+    });
   } catch (err) {
     console.error('[/war]', err.message);
+
+    // اگر Rich Message پشتیبانی نشد، پیام مناسب بده
+    if (
+      err.description?.includes('sendRichMessage') ||
+      err.message?.includes('sendRichMessage') ||
+      err.response?.description?.includes('sendRichMessage')
+    ) {
+      return ctx.reply(
+        '⚠️ نسخه فعلی کلاینت تلگرام از Rich Message پشتیبانی نمی‌کند.\nلطفاً تلگرام را آپدیت کنید.'
+      );
+    }
+
     return ctx.reply(`❌ خطا در دریافت اطلاعات وار: ${err.message}`);
   }
 };
