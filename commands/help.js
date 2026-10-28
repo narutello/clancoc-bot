@@ -17,6 +17,7 @@ module.exports = function helpCommand(ctx) {
 <b>دستورات اونر (فقط صاحب ربات):</b>
 /link TELEGRAM_ID #TAG — لینک اکانت برای کاربر دیگر
 /unlink TELEGRAM_ID #TAG — حذف لینک کاربر دیگر
+/testnotify — ارسال پیام تست به گروه اعلان‌ها
 
 مثال:
 <code>/link #ABC123XYZ</code>

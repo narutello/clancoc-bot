@@ -39,7 +39,6 @@ module.exports = async function warCommand(ctx) {
         ? `<p>⚔️ حمله‌ها: <b>${used}/${max}</b></p>`
         : '';
 
-    // زمان شروع / پایان
     let timeInfo = '';
     if (war.state === 'preparation') {
       const start =
@@ -57,7 +56,6 @@ module.exports = async function warCommand(ctx) {
       }
     }
 
-    // لینک‌های تلگرام اعضا
     const tags = members.map((m) => normalizeTag(m.tag));
     const linksMap = await getLinksForTags(tags);
 
@@ -78,11 +76,12 @@ module.exports = async function warCommand(ctx) {
           nameCell = escapeHtml(member.name || '—');
         }
 
+        const atkMax = war.attacksPerMember || 2;
         return `
           <tr>
             <td>${member.mapPosition ?? '—'}</td>
             <td>${nameCell}</td>
-            <td>${attacks.length}</td>
+            <td>${attacks.length}/${atkMax}</td>
             <td>${stars} ⭐</td>
             <td>${defStars} ⭐</td>
           </tr>

@@ -9,6 +9,7 @@ const unlinkAllCommand = require('../commands/unlinkall');
 const myAccountsCommand = require('../commands/myaccounts');
 const warCommand = require('../commands/war');
 const clanCommand = require('../commands/clan');
+const testNotifyCommand = require('../commands/testnotify');
 
 function createBot() {
   const bot = new Telegraf(config.botToken);
@@ -22,6 +23,7 @@ function createBot() {
   bot.command('myaccounts', myAccountsCommand);
   bot.command('war', warCommand);
   bot.command('clan', clanCommand);
+  bot.command('testnotify', testNotifyCommand);
 
   bot.catch((err, ctx) => {
     console.error(`[Bot] Error for ${ctx.updateType}:`, err.message);
