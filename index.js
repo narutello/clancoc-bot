@@ -41,33 +41,43 @@ async function main() {
   const bot = createBot();
   tgLog.setBot(bot);
 
-  try {
-    await bot.launch();
-  } catch (err) {
-    console.error('[FAIL] Bot launch failed:', err.message);
-    process.exit(1);
-  }
+  // مهم: launch را await نکن — در بعضی محیط‌ها Promise تمام نمی‌شود
+  bot
+    .launch()
+    .then(() => {
+      console.log('[OK] Telegram bot started (launch resolved)');
+    })
+    .catch((err) => {
+      console.error('[FAIL] Bot launch failed:', err.message);
+      process.exit(1);
+    });
 
-  console.log('[OK] Telegram bot started');
+  console.log('[OK] Bot launch initiated');
   console.log(`[INFO] Owner ID: ${config.ownerTelegramId}`);
   console.log(`[INFO] Clan Tag: #${config.clanTag}`);
   console.log(`[INFO] Group ID: ${config.telegramGroupId || 'not set'}`);
   console.log(`[INFO] Log channel: ${config.logTelegramId || 'not set'}`);
   console.log(`[INFO] API Base: ${config.clashApiBaseUrl}`);
 
-  // کمی صبر تا اتصال تلگرام پایدار شود، بعد پیام استارت به کانال لاگ
   setTimeout(async () => {
     try {
       const ok = await tgLog.sendStartupBanner();
       if (!ok) {
-        console.warn('[WARN] Startup log was not delivered to LOG_TELEGRAM_ID');
+        console.warn('[WARN] Startup log was not delivered');
       }
     } catch (e) {
       console.error('[WARN] Startup log error:', e.message);
     }
-  }, 2500);
+  }, 3000);
 
-  startWarMonitor(bot);
+  setTimeout(() => {
+    try {
+      startWarMonitor(bot);
+      console.log('[OK] War monitor started');
+    } catch (e) {
+      console.error('[FAIL] War monitor start:', e.message);
+    }
+  }, 4000);
 
   const stop = async (signal) => {
     console.log(`\nReceived ${signal}, shutting down...`);
