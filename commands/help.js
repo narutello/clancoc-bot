@@ -18,6 +18,7 @@ module.exports = function helpCommand(ctx) {
 /link TELEGRAM_ID #TAG — لینک اکانت برای کاربر دیگر
 /unlink TELEGRAM_ID #TAG — حذف لینک کاربر دیگر
 /testnotify — ارسال پیام تست به گروه اعلان‌ها
+/testlog — ارسال پیام تست به کانال لاگ
 
 مثال:
 <code>/link #ABC123XYZ</code>
