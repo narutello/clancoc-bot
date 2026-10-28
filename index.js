@@ -4,13 +4,13 @@ const { createBot } = require('./bot');
 const { migrate } = require('./database/migrate');
 const { startWarMonitor } = require('./services/warMonitor');
 const { pool } = require('./database');
+const { tgLog } = require('./utils/telegramLogger');
 
 async function main() {
   console.log('========================================');
   console.log('  ClanCoC Bot - Clash of Clans War Manager');
   console.log('========================================');
 
-  // Run migrations
   try {
     await migrate();
   } catch (err) {
@@ -18,7 +18,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Quick connectivity checks
   try {
     await pool.query('SELECT 1');
     console.log('[OK] Database connected');
@@ -27,7 +26,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Health-check server for Inject Cloud / hosting platforms
   const port = process.env.PORT || 3000;
   const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -39,28 +37,39 @@ async function main() {
   });
 
   const bot = createBot();
+  tgLog.setBot(bot);
 
-  // Launch bot
   bot
     .launch()
-    .then(() => {
+    .then(async () => {
       console.log('[OK] Telegram bot started');
       console.log(`[INFO] Owner ID: ${config.ownerTelegramId}`);
       console.log(`[INFO] Clan Tag: #${config.clanTag}`);
       console.log(`[INFO] Group ID: ${config.telegramGroupId || 'not set'}`);
+      console.log(`[INFO] Log channel: ${config.logTelegramId || 'not set'}`);
       console.log(`[INFO] API Base: ${config.clashApiBaseUrl}`);
 
-      // Start war monitoring
+      await tgLog.info('ربات آنلاین شد', {
+        clan: `#${config.clanTag}`,
+        group: config.telegramGroupId || null,
+        pollMs: config.warPollIntervalMs,
+      });
+
       startWarMonitor(bot);
     })
-    .catch((err) => {
+    .catch(async (err) => {
       console.error('[FAIL] Bot launch failed:', err.message);
+      try {
+        await tgLog.error('Bot launch failed', err.message);
+      } catch (_) {}
       process.exit(1);
     });
 
-  // Graceful shutdown
   const stop = async (signal) => {
     console.log(`\nReceived ${signal}, shutting down...`);
+    try {
+      await tgLog.warn(`Shutting down (${signal})`);
+    } catch (_) {}
     bot.stop(signal);
     server.close();
     await pool.end();

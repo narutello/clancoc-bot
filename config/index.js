@@ -17,6 +17,7 @@ const config = {
   telegramGroupId: process.env.TELEGRAM_GROUP_ID ? process.env.TELEGRAM_GROUP_ID.trim() : null,
   clanTag: (process.env.CLAN_TAG || '').replace(/^#/, '').toUpperCase(),
   warPollIntervalMs: Number(process.env.WAR_POLL_INTERVAL_MS) || 120000,
+  logTelegramId: process.env.LOG_TELEGRAM_ID ? process.env.LOG_TELEGRAM_ID.trim() : null,
 };
 
 if (!config.clanTag) {

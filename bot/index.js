@@ -1,5 +1,6 @@
 const { Telegraf } = require('telegraf');
 const config = require('../config');
+const { tgLog } = require('../utils/telegramLogger');
 
 const startCommand = require('../commands/start');
 const helpCommand = require('../commands/help');
@@ -25,10 +26,11 @@ function createBot() {
   bot.command('clan', clanCommand);
   bot.command('testnotify', testNotifyCommand);
 
-  bot.catch((err, ctx) => {
+  bot.catch(async (err, ctx) => {
     console.error(`[Bot] Error for ${ctx.updateType}:`, err.message);
+    await tgLog.error(`Bot error (${ctx.updateType})`, err.message);
     try {
-      ctx.reply('⚠️ خطایی رخ داد. لطفاً بعداً دوباره تلاش کنید.');
+      await ctx.reply('⚠️ خطایی رخ داد. لطفاً بعداً دوباره تلاش کنید.');
     } catch (_) {}
   });
 
