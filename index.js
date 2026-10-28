@@ -10,6 +10,8 @@ async function main() {
   console.log('========================================');
   console.log('  ClanCoC Bot - Clash of Clans War Manager');
   console.log('========================================');
+  console.log(`[INFO] LOG_TELEGRAM_ID=${config.logTelegramId || '(not set)'}`);
+  console.log(`[INFO] TELEGRAM_GROUP_ID=${config.telegramGroupId || '(not set)'}`);
 
   try {
     await migrate();
@@ -39,40 +41,46 @@ async function main() {
   const bot = createBot();
   tgLog.setBot(bot);
 
-  bot
-    .launch()
-    .then(async () => {
-      console.log('[OK] Telegram bot started');
-      console.log(`[INFO] Owner ID: ${config.ownerTelegramId}`);
-      console.log(`[INFO] Clan Tag: #${config.clanTag}`);
-      console.log(`[INFO] Group ID: ${config.telegramGroupId || 'not set'}`);
-      console.log(`[INFO] Log channel: ${config.logTelegramId || 'not set'}`);
-      console.log(`[INFO] API Base: ${config.clashApiBaseUrl}`);
+  try {
+    await bot.launch();
+  } catch (err) {
+    console.error('[FAIL] Bot launch failed:', err.message);
+    process.exit(1);
+  }
 
-      await tgLog.info('ربات آنلاین شد', {
-        clan: `#${config.clanTag}`,
-        group: config.telegramGroupId || null,
-        pollMs: config.warPollIntervalMs,
-      });
+  console.log('[OK] Telegram bot started');
+  console.log(`[INFO] Owner ID: ${config.ownerTelegramId}`);
+  console.log(`[INFO] Clan Tag: #${config.clanTag}`);
+  console.log(`[INFO] Group ID: ${config.telegramGroupId || 'not set'}`);
+  console.log(`[INFO] Log channel: ${config.logTelegramId || 'not set'}`);
+  console.log(`[INFO] API Base: ${config.clashApiBaseUrl}`);
 
-      startWarMonitor(bot);
-    })
-    .catch(async (err) => {
-      console.error('[FAIL] Bot launch failed:', err.message);
-      try {
-        await tgLog.error('Bot launch failed', err.message);
-      } catch (_) {}
-      process.exit(1);
-    });
+  // کمی صبر تا اتصال تلگرام پایدار شود، بعد پیام استارت به کانال لاگ
+  setTimeout(async () => {
+    try {
+      const ok = await tgLog.sendStartupBanner();
+      if (!ok) {
+        console.warn('[WARN] Startup log was not delivered to LOG_TELEGRAM_ID');
+      }
+    } catch (e) {
+      console.error('[WARN] Startup log error:', e.message);
+    }
+  }, 2500);
+
+  startWarMonitor(bot);
 
   const stop = async (signal) => {
     console.log(`\nReceived ${signal}, shutting down...`);
     try {
       await tgLog.warn(`Shutting down (${signal})`);
     } catch (_) {}
-    bot.stop(signal);
+    try {
+      bot.stop(signal);
+    } catch (_) {}
     server.close();
-    await pool.end();
+    try {
+      await pool.end();
+    } catch (_) {}
     process.exit(0);
   };
 
