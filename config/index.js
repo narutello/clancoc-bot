@@ -14,7 +14,7 @@ const config = {
   clashApiToken: requireEnv('CLASH_API_TOKEN'),
   clashApiBaseUrl: process.env.CLASH_API_BASE_URL || 'https://cocproxy.royaleapi.dev/v1',
   ownerTelegramId: Number(requireEnv('OWNER_TELEGRAM_ID')),
-  telegramGroupId: process.env.TELEGRAM_GROUP_ID ? Number(process.env.TELEGRAM_GROUP_ID) : null,
+  telegramGroupId: process.env.TELEGRAM_GROUP_ID ? process.env.TELEGRAM_GROUP_ID.trim() : null,
   clanTag: (process.env.CLAN_TAG || '').replace(/^#/, '').toUpperCase(),
   warPollIntervalMs: Number(process.env.WAR_POLL_INTERVAL_MS) || 120000,
 };

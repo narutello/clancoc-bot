@@ -64,24 +64,24 @@ INSERT INTO war_state (id, state) VALUES (1, 'unknown')
 ON CONFLICT (id) DO NOTHING;
 `;
 
-async function migrate() {
+async function migrate({ closePool = false } = {}) {
   console.log('[DB] Running migrations...');
   try {
     await query(SCHEMA);
     console.log('[DB] Migrations completed successfully.');
   } catch (err) {
     console.error('[DB] Migration failed:', err.message);
-    process.exit(1);
+    throw err;
   } finally {
-    // do not end pool when required from index
-    if (require.main === module) {
+    // فقط وقتی مستقیم با CLI اجرا شود pool را ببند
+    if (closePool) {
       await pool.end();
     }
   }
 }
 
 if (require.main === module) {
-  migrate();
+  migrate({ closePool: true }).catch(() => process.exit(1));
 }
 
 module.exports = { migrate };
