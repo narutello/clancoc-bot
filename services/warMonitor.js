@@ -106,7 +106,7 @@ function countAttacks(members) {
   return used;
 }
 
-async function buildMembersTableRows(members) {
+async function buildMembersTableRows(members, attacksPerMember = 2) {
   if (!members || members.length === 0) return '';
 
   const tags = members.map((m) => m.tag);
@@ -134,7 +134,7 @@ async function buildMembersTableRows(members) {
         <tr>
           <td>${m.mapPosition ?? '—'}</td>
           <td>${nameCell}</td>
-          <td>${attacks.length}</td>
+          <td>${attacks.length}/${attacksPerMember}</td>
           <td>${stars} ⭐</td>
           <td>${defStars} ⭐</td>
         </tr>
@@ -164,7 +164,7 @@ async function buildWarRichHtml(war, title, extraHtml = '') {
     if (formatted) timeInfo = `<p>🕐 پایان وار: <b>${formatted}</b></p>`;
   }
 
-  const rows = await buildMembersTableRows(members);
+  const rows = await buildMembersTableRows(members, war.attacksPerMember || 2);
 
   return `
     <h2>${title}</h2>
@@ -285,7 +285,6 @@ async function notifyOneHourLeft(bot, war, isCwl = false) {
   if (!end) return;
 
   const msLeft = end.getTime() - Date.now();
-  // بین ۵۰ تا ۷۰ دقیقه مانده → یک‌بار اعلام کن
   const minMs = 50 * 60 * 1000;
   const maxMs = 70 * 60 * 1000;
   if (msLeft < minMs || msLeft > maxMs) return;
