@@ -80,9 +80,20 @@ async function saveState(data) {
 
 function buildWarKey(war) {
   if (!war || war.state === 'notInWar') return 'notInWar';
-  const opp = war.opponent?.tag || 'unknown';
-  const start = war.preparationStartTime || war.startTime || 'x';
-  return `${normalizeTag(opp)}_${start}`;
+  const opp = normalizeTag(war.opponent?.tag || 'unknown');
+  const start =
+    parseClashTime(war.preparationStartTime) || parseClashTime(war.startTime);
+  const t = start ? start.getTime() : 0;
+  return `${opp}_${t}`;
+}
+
+function buildWarKeyFromSaved(last) {
+  if (!last || !last.opponent_tag) return null;
+  const opp = normalizeTag(last.opponent_tag);
+  const start = last.preparation_start || last.start_time;
+  const t = start ? new Date(start).getTime() : 0;
+  if (!opp || !t) return null;
+  return `${opp}_${t}`;
 }
 
 function extractMembers(war) {
@@ -322,6 +333,52 @@ async function notifyOneHourLeft(bot, war, isCwl = false) {
   await markNotification(warKey, event);
 }
 
+async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
+  if (!last || !last.opponent_tag) return;
+  const warKey = buildWarKeyFromSaved(last);
+  if (!warKey) return;
+
+  const event = isCwl ? 'cwl_war_ended' : 'war_ended';
+  if (await hasNotification(warKey, event)) return;
+
+  const ourStars = last.our_stars ?? 0;
+  const theirStars = last.their_stars ?? 0;
+  const ourDest = Number(last.our_destruction ?? 0);
+  const theirDest = Number(last.their_destruction ?? 0);
+
+  let result = 'tie';
+  if (ourStars > theirStars) result = 'win';
+  else if (ourStars < theirStars) result = 'lose';
+  else if (ourDest > theirDest) result = 'win';
+  else if (ourDest < theirDest) result = 'lose';
+
+  const html = `
+    <h2>🏁 وار به پایان رسید!${isCwl ? ' (CWL)' : ''}</h2>
+    <p><i>ربات هنگام پایان آفلاین بود؛ نتیجه از آخرین وضعیت ذخیره‌شده:</i></p>
+    <table bordered striped compact>
+      <tr>
+        <th>کلن</th>
+        <th>ستاره</th>
+        <th>تخریب</th>
+      </tr>
+      <tr>
+        <td>🏰 کلن ما</td>
+        <td>${ourStars} ⭐</td>
+        <td>${ourDest.toFixed(1)}%</td>
+      </tr>
+      <tr>
+        <td>⚡ حریف</td>
+        <td>${theirStars} ⭐</td>
+        <td>${theirDest.toFixed(1)}%</td>
+      </tr>
+    </table>
+    <p>نتیجه: <b>${resultLabel(result)}</b></p>
+  `.trim();
+
+  await sendToGroup(bot, html);
+  await markNotification(warKey, event);
+}
+
 async function notifyWarEnded(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_war_ended' : 'war_ended';
@@ -345,22 +402,42 @@ async function notifyWarEnded(bot, war, isCwl = false) {
 }
 
 async function checkRegularWar(bot) {
+  const last = await getLastState();
+
   let war;
   try {
     war = await getCurrentWar();
   } catch (err) {
     if (err.isNotFound) {
-      return null;
+      war = { state: 'notInWar' };
+    } else {
+      throw err;
     }
-    throw err;
   }
 
+  // اگر وار تمام شده و API دیگر notInWar می‌دهد، از آخرین وضعیت ذخیره‌شده اعلان پایان بده
   if (!war || war.state === 'notInWar') {
+    if (
+      last &&
+      !last.is_cwl &&
+      last.state &&
+      last.state !== 'notInWar'
+    ) {
+      await notifyWarEndedFromSaved(bot, last, false);
+    }
+    await saveState({
+      state: 'notInWar',
+      isCwl: false,
+      opponentTag: null,
+      warTag: null,
+      membersJson: null,
+    });
     return { state: 'notInWar', isCwl: false };
   }
 
   const members = extractMembers(war);
 
+  // با روشن شدن ربات وسط هر مرحله، اعلان‌های ارسال‌نشده همان مرحله را می‌فرستد
   if (war.state === 'preparation') {
     await notifyOpponentFound(bot, war, false);
     await notifyPreparation(bot, war, false);
@@ -382,10 +459,10 @@ async function checkRegularWar(bot) {
     opponentTag: war.opponent?.tag,
     teamSize: war.teamSize,
     preparationStart: war.preparationStartTime
-      ? new Date(war.preparationStartTime)
+      ? parseClashTime(war.preparationStartTime)
       : null,
-    startTime: war.startTime ? new Date(war.startTime) : null,
-    endTime: war.endTime ? new Date(war.endTime) : null,
+    startTime: war.startTime ? parseClashTime(war.startTime) : null,
+    endTime: war.endTime ? parseClashTime(war.endTime) : null,
     ourStars: war.clan?.stars,
     theirStars: war.opponent?.stars,
     ourDestruction: war.clan?.destructionPercentage,
