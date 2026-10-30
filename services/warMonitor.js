@@ -204,25 +204,14 @@ async function sendToGroup(bot, html) {
   }
 }
 
-async function notifyOpponentFound(bot, war, isCwl = false) {
-  const warKey = buildWarKey(war);
-  const event = isCwl ? 'cwl_opponent_found' : 'opponent_found';
-  if (await hasNotification(warKey, event)) return;
-  const title = `⚔️ حریف وار پیدا شد!${isCwl ? ' (CWL)' : ''}`;
-  const html = await buildWarRichHtml(war, title);
-  await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: حریف پیدا شد' + (isCwl ? ' (CWL)' : ''));
-  await markNotification(warKey, event);
-}
-
 async function notifyPreparation(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_preparation' : 'preparation';
   if (await hasNotification(warKey, event)) return;
-  const title = `⏳ مرحله آماده‌سازی شروع شد!${isCwl ? ' (CWL)' : ''}`;
+  const title = `⚔️ حریف پیدا شد — آماده‌سازی شروع شد!${isCwl ? ' (CWL)' : ''}`;
   const html = await buildWarRichHtml(war, title);
   await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: آماده‌سازی' + (isCwl ? ' (CWL)' : ''));
+  await tgLog.info('اعلان ارسال شد: حریف/آماده‌سازی' + (isCwl ? ' (CWL)' : ''));
   await markNotification(warKey, event);
 }
 
@@ -329,12 +318,11 @@ async function checkRegularWar(bot) {
     return { state: 'notInWar', isCwl: false };
   }
   const members = extractMembers(war);
+  // API: پیدا شدن حریف و آماده‌سازی یک وضعیت است → فقط یک پیام
   if (war.state === 'preparation') {
-    await notifyOpponentFound(bot, war, false);
     await notifyPreparation(bot, war, false);
   }
   if (war.state === 'inWar') {
-    await notifyOpponentFound(bot, war, false);
     await notifyBattleStart(bot, war, false);
     await notifyOneHourLeft(bot, war, false);
   }
@@ -386,11 +374,9 @@ async function checkCwl(bot) {
           war.opponent = tmp;
         }
         if (war.state === 'preparation') {
-          await notifyOpponentFound(bot, war, true);
           await notifyPreparation(bot, war, true);
         }
         if (war.state === 'inWar') {
-          await notifyOpponentFound(bot, war, true);
           await notifyBattleStart(bot, war, true);
           await notifyOneHourLeft(bot, war, true);
         }
