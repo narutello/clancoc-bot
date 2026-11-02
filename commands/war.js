@@ -1,9 +1,8 @@
 const {
   getCurrentWar,
-  getCurrentWarLeagueGroup,
-  getCwlWar,
 } = require('../api/clash');
 const { getLinksForTags } = require('../services/linkService');
+const { findOurCwlWar, formatCwlDayLabel } = require('../services/cwlService');
 const {
   escapeHtml,
   warStateLabel,
@@ -13,49 +12,20 @@ const {
   formatWarTime,
   parseClashTime,
 } = require('../utils/helpers');
-const config = require('../config');
 
 /** وار معمولی؛ اگر نبود، وار فعلی CWL کلن */
 async function resolveActiveWar() {
   try {
     const war = await getCurrentWar();
     if (war && war.state && war.state !== 'notInWar') {
-      return { war, isCwl: false };
+      return { war, isCwl: false, cwlDay: null, cwlTotalDays: null };
     }
   } catch (err) {
     if (!err.isNotFound) throw err;
   }
 
   try {
-    const group = await getCurrentWarLeagueGroup();
-    if (!group || !group.rounds) return null;
-
-    const ourTag = normalizeTag(config.clanTag);
-
-    for (const round of group.rounds || []) {
-      for (const warTag of round.warTags || []) {
-        if (!warTag || warTag === '#0') continue;
-        try {
-          const war = await getCwlWar(warTag);
-          const clanTag = normalizeTag(war.clan?.tag);
-          const oppTag = normalizeTag(war.opponent?.tag);
-          const isOur = clanTag === ourTag || oppTag === ourTag;
-          if (!isOur) continue;
-
-          if (oppTag === ourTag) {
-            const tmp = war.clan;
-            war.clan = war.opponent;
-            war.opponent = tmp;
-          }
-
-          if (war.state && war.state !== 'notInWar') {
-            return { war, isCwl: true };
-          }
-        } catch (_) {
-          continue;
-        }
-      }
-    }
+    return await findOurCwlWar();
   } catch (err) {
     if (!err.isNotFound) {
       console.warn('[/war] CWL lookup failed:', err.message);
@@ -73,7 +43,7 @@ module.exports = async function warCommand(ctx) {
       return ctx.reply('در حال حاضر کلن در وار نیست.');
     }
 
-    const { war, isCwl } = resolved;
+    const { war, isCwl, cwlDay, cwlTotalDays } = resolved;
     const our = war.clan || {};
     const opp = war.opponent || {};
     const members = (our.members || [])
@@ -149,9 +119,14 @@ module.exports = async function warCommand(ctx) {
     const ourName = stripEmojis(our.name || '—') || '—';
     const oppName = stripEmojis(opp.name || '—') || '—';
     const cwlBadge = isCwl ? ' (CWL)' : '';
+    const dayLabel = isCwl ? formatCwlDayLabel(cwlDay, cwlTotalDays) : '';
+    const dayLine = dayLabel
+      ? `<p>📅 <b>${escapeHtml(dayLabel)}</b> لیگ کلن‌ها</p>`
+      : '';
 
     const html = `
       <h2>⚔️ وضعیت وار${cwlBadge}</h2>
+      ${dayLine}
 
       <table bordered striped compact>
         <tr>
