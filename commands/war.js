@@ -96,10 +96,12 @@ async function buildMemberRows(members, attacksPerMember) {
         nameCell = escapeHtml(member.name || '—');
       }
 
+      const th = member.townhallLevel ?? member.townHallLevel ?? '—';
       return `
         <tr>
           <td>${member.mapPosition ?? '—'}</td>
           <td>${nameCell}</td>
+          <td>${th}</td>
           <td>${attacks.length}/${atkMax}</td>
           <td>${stars} ⭐</td>
           <td>${defStars} ⭐</td>
@@ -167,6 +169,7 @@ async function buildOurHtml(resolved) {
       <tr>
         <th>#</th>
         <th>بازیکن</th>
+        <th>TH</th>
         <th>حمله</th>
         <th>ستاره</th>
         <th>دفاع</th>
@@ -210,6 +213,7 @@ async function buildEnemyHtml(resolved) {
       <tr>
         <th>#</th>
         <th>بازیکن</th>
+        <th>TH</th>
         <th>حمله</th>
         <th>ستاره</th>
         <th>دفاع</th>
