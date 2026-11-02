@@ -139,7 +139,8 @@ async function buildMembersTableRows(members, attacksPerMember = 2) {
       } else {
         nameCell = escapeHtml(m.name || formatTag(m.tag));
       }
-      return `<tr><td>${m.mapPosition ?? '—'}</td><td>${nameCell}</td><td>${attacks.length}/${attacksPerMember}</td><td>${stars} ⭐</td><td>${defStars} ⭐</td></tr>`;
+      const th = m.townhallLevel ?? m.townHallLevel ?? '—';
+      return `<tr><td>${m.mapPosition ?? '—'}</td><td>${nameCell}</td><td>${th}</td><td>${attacks.length}/${attacksPerMember}</td><td>${stars} ⭐</td><td>${defStars} ⭐</td></tr>`;
     })
     .join('');
 }
@@ -178,7 +179,7 @@ ${timeInfo}
 ${extraHtml}
 <h3>📋 اعضای وار</h3>
 <table bordered striped compact>
-<tr><th>#</th><th>بازیکن</th><th>حمله</th><th>ستاره</th><th>دفاع</th></tr>
+<tr><th>#</th><th>بازیکن</th><th>TH</th><th>حمله</th><th>ستاره</th><th>دفاع</th></tr>
 ${rows}
 </table>`.trim();
 }
