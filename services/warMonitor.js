@@ -18,6 +18,7 @@ const {
 } = require('../utils/helpers');
 const config = require('../config');
 const { tgLog } = require('../utils/telegramLogger');
+const { findOurCwlWar, formatCwlDayLabel } = require('./cwlService');
 
 let lastLoggedWarState = null;
 
@@ -143,7 +144,7 @@ async function buildMembersTableRows(members, attacksPerMember = 2) {
     .join('');
 }
 
-async function buildWarRichHtml(war, title, extraHtml = '') {
+async function buildWarRichHtml(war, title, extraHtml = '', cwlMeta = null) {
   const our = war.clan || {};
   const opp = war.opponent || {};
   const members = extractMembers(war);
@@ -161,7 +162,12 @@ async function buildWarRichHtml(war, title, extraHtml = '') {
     if (formatted) timeInfo = `<p>🕐 پایان وار: <b>${formatted}</b></p>`;
   }
   const rows = await buildMembersTableRows(members, war.attacksPerMember || 2);
+  const dayLine =
+    cwlMeta && cwlMeta.cwlDay
+      ? `<p>📅 <b>${formatCwlDayLabel(cwlMeta.cwlDay, cwlMeta.cwlTotalDays)}</b> لیگ کلن‌ها</p>`
+      : '';
   return `<h2>${title}</h2>
+${dayLine}
 <table bordered striped compact>
 <tr><th>کلن</th><th>ستاره</th><th>تخریب</th></tr>
 <tr><td>🏰 ${escapeHtml(ourName)}</td><td>${our.stars ?? 0} ⭐</td><td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td></tr>
@@ -209,7 +215,7 @@ async function notifyPreparation(bot, war, isCwl = false) {
   const event = isCwl ? 'cwl_preparation' : 'preparation';
   if (await hasNotification(warKey, event)) return;
   const title = `⚔️ حریف پیدا شد — آماده‌سازی شروع شد!${isCwl ? ' (CWL)' : ''}`;
-  const html = await buildWarRichHtml(war, title);
+  const html = await buildWarRichHtml(war, title, '', war.__cwlMeta || null);
   await sendToGroup(bot, html);
   await tgLog.info('اعلان ارسال شد: حریف/آماده‌سازی' + (isCwl ? ' (CWL)' : ''));
   await markNotification(warKey, event);
@@ -224,7 +230,7 @@ async function notifyBattleStart(bot, war, isCwl = false) {
   const maxAttacks = (war.teamSize || members.length) * (war.attacksPerMember || 2);
   const extra = `<p>⚔️ حمله‌ها: <b>${attacksUsed}/${maxAttacks}</b></p>`;
   const title = `🔥 روز نبرد شروع شد!${isCwl ? ' (CWL)' : ''}`;
-  const html = await buildWarRichHtml(war, title, extra);
+  const html = await buildWarRichHtml(war, title, extra, war.__cwlMeta || null);
   await sendToGroup(bot, html);
   await tgLog.info('اعلان ارسال شد: شروع نبرد' + (isCwl ? ' (CWL)' : ''));
   await markNotification(warKey, event);
@@ -242,7 +248,12 @@ async function notifyOneHourLeft(bot, war, isCwl = false) {
   const their = war.opponent || {};
   const ourName = stripEmojis(our.name || '—') || '—';
   const oppName = stripEmojis(their.name || '—') || '—';
-  const html = `<h2>⏰ ۱ ساعت تا پایان وار</h2>
+  const dayLine =
+    war.__cwlMeta && war.__cwlMeta.cwlDay
+      ? `📅 ${formatCwlDayLabel(war.__cwlMeta.cwlDay, war.__cwlMeta.cwlTotalDays)} لیگ کلن‌ها\n`
+      : '';
+  const html = `<h2>⏰ ۱ ساعت تا پایان وار${isCwl ? ' (CWL)' : ''}</h2>
+${dayLine ? `<p>${dayLine.trim()}</p>` : ''}
 <table bordered striped compact>
 <tr><th>کلن</th><th>ستاره</th><th>تخریب</th></tr>
 <tr><td>🏰 ${escapeHtml(ourName)}</td><td>${our.stars ?? 0} ⭐</td><td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td></tr>
@@ -295,7 +306,7 @@ async function notifyWarEnded(bot, war, isCwl = false) {
   else if ((our.destructionPercentage || 0) < (their.destructionPercentage || 0)) result = 'lose';
   const extra = `<p>نتیجه: <b>${resultLabel(result)}</b></p>`;
   const title = `🏁 وار به پایان رسید!${isCwl ? ' (CWL)' : ''}`;
-  const html = await buildWarRichHtml(war, title, extra);
+  const html = await buildWarRichHtml(war, title, extra, war.__cwlMeta || null);
   await sendToGroup(bot, html);
   await tgLog.info('اعلان ارسال شد: پایان وار' + (isCwl ? ' (CWL)' : ''));
   await markNotification(warKey, event);
@@ -318,7 +329,6 @@ async function checkRegularWar(bot) {
     return { state: 'notInWar', isCwl: false };
   }
   const members = extractMembers(war);
-  // API: پیدا شدن حریف و آماده‌سازی یک وضعیت است → فقط یک پیام
   if (war.state === 'preparation') {
     await notifyPreparation(bot, war, false);
   }
@@ -348,57 +358,45 @@ async function checkRegularWar(bot) {
 }
 
 async function checkCwl(bot) {
-  let group;
+  let found;
   try {
-    group = await getCurrentWarLeagueGroup();
+    found = await findOurCwlWar();
   } catch (err) {
-    if (err.isNotFound || err.status === 404) return null;
-    console.warn('[WarMonitor] CWL group fetch failed:', err.message);
-    await tgLog.warn('CWL group fetch failed', err.message);
+    console.warn('[WarMonitor] CWL lookup failed:', err.message);
+    await tgLog.warn('CWL lookup failed', err.message);
     return null;
   }
-  if (!group || !group.rounds) return null;
-  const ourTag = normalizeTag(config.clanTag);
-  for (const round of group.rounds || []) {
-    for (const warTag of round.warTags || []) {
-      if (warTag === '#0' || !warTag) continue;
-      try {
-        const war = await getCwlWar(warTag);
-        const isOurWar =
-          normalizeTag(war.clan?.tag) === ourTag ||
-          normalizeTag(war.opponent?.tag) === ourTag;
-        if (!isOurWar) continue;
-        if (normalizeTag(war.opponent?.tag) === ourTag) {
-          const tmp = war.clan;
-          war.clan = war.opponent;
-          war.opponent = tmp;
-        }
-        if (war.state === 'preparation') {
-          await notifyPreparation(bot, war, true);
-        }
-        if (war.state === 'inWar') {
-          await notifyBattleStart(bot, war, true);
-          await notifyOneHourLeft(bot, war, true);
-        }
-        if (war.state === 'warEnded') {
-          await notifyWarEnded(bot, war, true);
-        }
-        await saveState({
-          state: war.state,
-          warTag: warTag,
-          opponentTag: war.opponent?.tag,
-          teamSize: war.teamSize,
-          isCwl: true,
-          ourStars: war.clan?.stars,
-          theirStars: war.opponent?.stars,
-        });
-        return war;
-      } catch (e) {
-        continue;
-      }
-    }
+
+  if (!found || !found.war) return null;
+
+  const war = found.war;
+  war.__cwlMeta = {
+    cwlDay: found.cwlDay,
+    cwlTotalDays: found.cwlTotalDays,
+  };
+
+  if (war.state === 'preparation') {
+    await notifyPreparation(bot, war, true);
   }
-  return null;
+  if (war.state === 'inWar') {
+    await notifyBattleStart(bot, war, true);
+    await notifyOneHourLeft(bot, war, true);
+  }
+  if (war.state === 'warEnded') {
+    await notifyWarEnded(bot, war, true);
+  }
+
+  await saveState({
+    state: war.state,
+    warTag: war.tag || null,
+    opponentTag: war.opponent?.tag,
+    teamSize: war.teamSize,
+    isCwl: true,
+    ourStars: war.clan?.stars,
+    theirStars: war.opponent?.stars,
+  });
+
+  return war;
 }
 
 async function checkWarStatus(bot) {
