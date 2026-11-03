@@ -9,6 +9,7 @@ const {
   stripEmojis,
   formatWarTime,
   parseClashTime,
+  getAttacksPerMember,
 } = require('../utils/helpers');
 
 async function resolveActiveWar() {
@@ -50,9 +51,9 @@ function sortMembers(list) {
     .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0));
 }
 
-function buildTimeAndAttacks(war, members, teamSize) {
+function buildTimeAndAttacks(war, members, teamSize, isCwl = false) {
   const used = members.reduce((sum, m) => sum + (m.attacks || []).length, 0);
-  const max = teamSize * (war.attacksPerMember || 2);
+  const max = teamSize * getAttacksPerMember(war, isCwl);
 
   const attacksInfo =
     war.state === 'inWar' || war.state === 'warEnded'
@@ -80,7 +81,7 @@ async function buildMemberRows(members, attacksPerMember) {
   const atkMax = attacksPerMember || 2;
 
   return members
-    .map((member) => {
+    .map((member, index) => {
       const attacks = member.attacks || [];
       const stars = attacks.reduce((sum, a) => sum + (a.stars || 0), 0);
       const defStars = member.bestOpponentAttack?.stars ?? 0;
@@ -97,9 +98,10 @@ async function buildMemberRows(members, attacksPerMember) {
       }
 
       const th = member.townhallLevel ?? member.townHallLevel ?? '—';
+      const rowNum = index + 1;
       return `
         <tr>
-          <td>${member.mapPosition ?? '—'}</td>
+          <td>${rowNum}</td>
           <td>${nameCell}</td>
           <td>${th}</td>
           <td>${attacks.length}/${atkMax}</td>
@@ -153,8 +155,9 @@ async function buildOurHtml(resolved) {
     bestOpponentAttack: m.bestOpponentAttack || null,
   }));
   const teamSize = war.teamSize || members.length;
-  const { attacksInfo, timeInfo } = buildTimeAndAttacks(war, members, teamSize);
-  const rows = await buildMemberRows(members, war.attacksPerMember || 2);
+  const atkPer = getAttacksPerMember(war, isCwl);
+  const { attacksInfo, timeInfo } = buildTimeAndAttacks(war, members, teamSize, isCwl);
+  const rows = await buildMemberRows(members, atkPer);
 
   return `
     ${clanHeaderHtml(war, isCwl, cwlDay, cwlTotalDays, '⚔️ وضعیت وار')}
@@ -195,8 +198,9 @@ async function buildEnemyHtml(resolved) {
   }
 
   const teamSize = war.teamSize || members.length;
-  const { attacksInfo, timeInfo } = buildTimeAndAttacks(war, members, teamSize);
-  const rows = await buildMemberRows(members, war.attacksPerMember || 2);
+  const atkPer = getAttacksPerMember(war, isCwl);
+  const { attacksInfo, timeInfo } = buildTimeAndAttacks(war, members, teamSize, isCwl);
+  const rows = await buildMemberRows(members, atkPer);
   const oppName = stripEmojis(opp.name || '—') || '—';
 
   return `
