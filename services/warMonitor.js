@@ -15,6 +15,7 @@ const {
   normalizeTag,
   stripEmojis,
   formatWarTime,
+  getAttacksPerMember,
 } = require('../utils/helpers');
 const config = require('../config');
 const { tgLog } = require('../utils/telegramLogger');
@@ -128,7 +129,7 @@ async function buildMembersTableRows(members, attacksPerMember = 2) {
   return members
     .slice()
     .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0))
-    .map((m) => {
+    .map((m, index) => {
       const attacks = m.attacks || [];
       const stars = attacks.reduce((sum, a) => sum + (a.stars || 0), 0);
       const defStars = m.bestOpponentAttack?.stars ?? 0;
@@ -140,7 +141,8 @@ async function buildMembersTableRows(members, attacksPerMember = 2) {
         nameCell = escapeHtml(m.name || formatTag(m.tag));
       }
       const th = m.townhallLevel ?? m.townHallLevel ?? '—';
-      return `<tr><td>${m.mapPosition ?? '—'}</td><td>${nameCell}</td><td>${th}</td><td>${attacks.length}/${attacksPerMember}</td><td>${stars} ⭐</td><td>${defStars} ⭐</td></tr>`;
+      const rowNum = index + 1;
+      return `<tr><td>${rowNum}</td><td>${nameCell}</td><td>${th}</td><td>${attacks.length}/${attacksPerMember}</td><td>${stars} ⭐</td><td>${defStars} ⭐</td></tr>`;
     })
     .join('');
 }
@@ -162,7 +164,8 @@ async function buildWarRichHtml(war, title, extraHtml = '', cwlMeta = null) {
     const formatted = formatWarTime(end);
     if (formatted) timeInfo = `<p>🕐 پایان وار: <b>${formatted}</b></p>`;
   }
-  const rows = await buildMembersTableRows(members, war.attacksPerMember || 2);
+  const isCwlWar = Boolean(cwlMeta && cwlMeta.cwlDay) || Boolean(war.__cwlMeta);
+  const rows = await buildMembersTableRows(members, getAttacksPerMember(war, isCwlWar));
   const dayLine =
     cwlMeta && cwlMeta.cwlDay
       ? `<p>📅 <b>${formatCwlDayLabel(cwlMeta.cwlDay, cwlMeta.cwlTotalDays)}</b> لیگ کلن‌ها</p>`
@@ -228,7 +231,7 @@ async function notifyBattleStart(bot, war, isCwl = false) {
   if (await hasNotification(warKey, event)) return;
   const members = extractMembers(war);
   const attacksUsed = countAttacks(members);
-  const maxAttacks = (war.teamSize || members.length) * (war.attacksPerMember || 2);
+  const maxAttacks = (war.teamSize || members.length) * getAttacksPerMember(war, isCwl);
   const extra = `<p>⚔️ حمله‌ها: <b>${attacksUsed}/${maxAttacks}</b></p>`;
   const title = `🔥 روز نبرد شروع شد!${isCwl ? ' (CWL)' : ''}`;
   const html = await buildWarRichHtml(war, title, extra, war.__cwlMeta || null);
