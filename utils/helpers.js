@@ -39,9 +39,7 @@ function formatDuration(ms) {
 function parseClashTime(iso) {
   if (!iso) return null;
   try {
-    // فرمت Clash: 20241027T183000.000Z → باید به ISO استاندارد تبدیل شود
     let s = String(iso).trim();
-    // 20241027T183000.000Z
     const m = s.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?:\.\d+)?Z?$/);
     if (m) {
       s = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}.000Z`;
@@ -53,7 +51,6 @@ function parseClashTime(iso) {
   }
 }
 
-/** حذف ایموجی از اسم کلن */
 function stripEmojis(text) {
   if (!text) return '';
   return String(text)
@@ -65,13 +62,6 @@ function stripEmojis(text) {
     .trim();
 }
 
-/**
- * فرمت زمان وار به فارسی خوانا
- * مثال:
- * - امروز ساعت ۱۴:۳۰
- * - فردا ساعت ۰۸:۰۰
- * - سه‌شنبه ساعت ۲۱:۱۵
- */
 function formatWarTime(date) {
   if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
 
@@ -134,7 +124,17 @@ function resultLabel(result) {
   return result || '—';
 }
 
+/** تعداد حمله مجاز هر بازیکن: CWL=1 ، وار معمولی=2 */
+function getAttacksPerMember(war, isCwl = false) {
+  if (isCwl) return 1;
+  if (war && war.attacksPerMember != null && war.attacksPerMember > 0) {
+    return Number(war.attacksPerMember);
+  }
+  return 2;
+}
+
 module.exports = {
+  getAttacksPerMember,
   normalizeTag,
   isValidTag,
   formatTag,
