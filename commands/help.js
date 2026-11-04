@@ -1,28 +1,27 @@
-module.exports = function helpCommand(ctx) {
+module.exports = async function helpCommand(ctx) {
   const text = `
-📖 <b>راهنمای دستورات</b>
+🤖 <b>راهنمای ربات مدیریت وار</b>
 
-<b>عمومی:</b>
-/start — معرفی ربات
-/help — همین راهنما
-/war — وضعیت فعلی وار
+<b>دستورات عمومی</b>
+/war — وضعیت وار معمولی
+/cwl — وضعیت لیگ کلن‌ها (CWL)
 /clan — اطلاعات کلن
+/help — همین راهنما
 
-<b>مدیریت اکانت‌ها:</b>
-/link #TAG — لینک اکانت کلش به حساب خودت
-/myaccounts — لیست اکانت‌های لینک‌شده
-/unlink #TAG — حذف لینک یک اکانت
-/unlinkall — حذف تمام لینک‌های خودت
+<b>اکانت‌ها</b>
+/link #TAG — لینک اکانت کلش به تلگرام
+/unlink #TAG — حذف لینک
+/unlinkall — حذف همه لینک‌های شما
+/myaccounts — فهرست اکانت‌های لینک‌شده
 
-<b>دستورات اونر (فقط صاحب ربات):</b>
-/link TELEGRAM_ID #TAG — لینک اکانت برای کاربر دیگر
-/unlink TELEGRAM_ID #TAG — حذف لینک کاربر دیگر
-/testnotify — ارسال پیام تست به گروه اعلان‌ها
-/testlog — ارسال پیام تست به کانال لاگ
+<b>نکته CWL</b>
+در لیگ کلن‌ها از /cwl استفاده کنید.
+اگر /war بزنید و کلن در CWL باشد، ربات شما را به /cwl راهنمایی می‌کند.
 
-مثال:
-<code>/link #ABC123XYZ</code>
-<code>/link 123456789 #ABC123XYZ</code>
+<b>Owner</b>
+<code>/link TELEGRAM_USER_ID #TAG</code>
+<code>/testnotify</code>
+<code>/testlog</code>
 `.trim();
 
   return ctx.reply(text, { parse_mode: 'HTML' });

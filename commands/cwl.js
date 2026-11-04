@@ -1,0 +1,116 @@
+const { findOurCwlWar } = require('../services/cwlService');
+const config = require('../config');
+const { checkCommandLimit } = require('../utils/commandRateLimit');
+const { singleflight } = require('../utils/singleflight');
+const { getCache, setCache } = require('../utils/ttlCache');
+const {
+  keyboardOur,
+  keyboardEnemy,
+  buildOurHtml,
+  buildEnemyHtml,
+  sendRich,
+  editRich,
+  richMessageErrorReply,
+} = require('./warView');
+
+async function fetchCwlWar() {
+  try {
+    const found = await findOurCwlWar();
+    if (found && found.war) return found;
+  } catch (err) {
+    if (!err.isNotFound) throw err;
+  }
+  return null;
+}
+
+async function resolveCwlWar() {
+  const cacheKey = `cwlWar:${config.clanTag}`;
+  const cached = getCache(cacheKey);
+  if (cached !== null) return cached;
+
+  return singleflight(cacheKey, async () => {
+    const again = getCache(cacheKey);
+    if (again !== null) return again;
+    const result = await fetchCwlWar();
+    setCache(cacheKey, result, config.warCacheTtlMs);
+    return result;
+  });
+}
+
+async function cwlCommand(ctx) {
+  try {
+    const userId = ctx.from?.id;
+    const isOwner =
+      userId != null && Number(userId) === Number(config.ownerTelegramId);
+    const limit = checkCommandLimit(userId, 'cwl', {
+      limit: config.cwlCmdLimit,
+      windowMs: config.cwlCmdWindowMs,
+      isOwner,
+    });
+    if (!limit.allowed) {
+      return ctx.reply(
+        `⏳ تعداد درخواست‌های /cwl زیاد است.\n` +
+          `لطفاً حدود <b>${limit.retryAfterSec}</b> ثانیه دیگر دوباره تلاش کنید.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    const resolved = await resolveCwlWar();
+    if (!resolved || !resolved.war) {
+      return ctx.reply('در حال حاضر کلن در لیگ کلن‌ها (CWL) نیست.');
+    }
+
+    const html = await buildOurHtml(resolved, '🏟 وضعیت لیگ کلن‌ها');
+    return sendRich(ctx, html, keyboardOur('cwl'));
+  } catch (err) {
+    console.error('[/cwl]', err.message);
+    return richMessageErrorReply(
+      ctx,
+      err,
+      `❌ خطا در دریافت اطلاعات CWL: ${err.message}`
+    );
+  }
+}
+
+async function cwlEnemyAction(ctx) {
+  try {
+    const resolved = await resolveCwlWar();
+    if (!resolved || !resolved.war) {
+      return ctx.answerCbQuery('در حال حاضر کلن در CWL نیست.', {
+        show_alert: true,
+      });
+    }
+    await ctx.answerCbQuery();
+    const html = await buildEnemyHtml(resolved, '⚡ تیم حریف (CWL)');
+    return editRich(ctx, html, keyboardEnemy('cwl'));
+  } catch (err) {
+    console.error('[cwl:enemy]', err.message);
+    try {
+      await ctx.answerCbQuery('خطا در دریافت اطلاعات حریف', { show_alert: true });
+    } catch (_) {}
+  }
+}
+
+async function cwlHomeAction(ctx) {
+  try {
+    const resolved = await resolveCwlWar();
+    if (!resolved || !resolved.war) {
+      return ctx.answerCbQuery('در حال حاضر کلن در CWL نیست.', {
+        show_alert: true,
+      });
+    }
+    await ctx.answerCbQuery();
+    const html = await buildOurHtml(resolved, '🏟 وضعیت لیگ کلن‌ها');
+    return editRich(ctx, html, keyboardOur('cwl'));
+  } catch (err) {
+    console.error('[cwl:home]', err.message);
+    try {
+      await ctx.answerCbQuery('خطا در بازگشت', { show_alert: true });
+    } catch (_) {}
+  }
+}
+
+module.exports = cwlCommand;
+module.exports.cwlEnemyAction = cwlEnemyAction;
+module.exports.cwlHomeAction = cwlHomeAction;
+module.exports.resolveCwlWar = resolveCwlWar;

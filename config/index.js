@@ -32,6 +32,8 @@ const config = {
   warCmdWindowMs: intEnv('WAR_CMD_WINDOW_MS', 60000),
   clanCmdLimit: intEnv('CLAN_CMD_LIMIT', 8),
   clanCmdWindowMs: intEnv('CLAN_CMD_WINDOW_MS', 60000),
+  cwlCmdLimit: intEnv('CWL_CMD_LIMIT', 5),
+  cwlCmdWindowMs: intEnv('CWL_CMD_WINDOW_MS', 60000),
 
   warCacheTtlMs: intEnv('WAR_CACHE_TTL_MS', 8000),
 

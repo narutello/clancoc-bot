@@ -10,6 +10,8 @@ const unlinkAllCommand = require('../commands/unlinkall');
 const myAccountsCommand = require('../commands/myaccounts');
 const warCommand = require('../commands/war');
 const { warEnemyAction, warHomeAction } = warCommand;
+const cwlCommand = require('../commands/cwl');
+const { cwlEnemyAction, cwlHomeAction } = cwlCommand;
 const clanCommand = require('../commands/clan');
 const testNotifyCommand = require('../commands/testnotify');
 const testLogCommand = require('../commands/testlog');
@@ -27,6 +29,9 @@ function createBot() {
   bot.command('war', warCommand);
   bot.action('war:enemy', warEnemyAction);
   bot.action('war:home', warHomeAction);
+  bot.command('cwl', cwlCommand);
+  bot.action('cwl:enemy', cwlEnemyAction);
+  bot.action('cwl:home', cwlHomeAction);
   bot.command('clan', clanCommand);
   bot.command('testnotify', testNotifyCommand);
   bot.command('testlog', testLogCommand);

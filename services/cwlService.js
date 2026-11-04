@@ -7,7 +7,6 @@ const config = require('../config');
 
 /**
  * پیدا کردن وار فعال/آخرین وار CWL کلن + شماره روز
- * @returns {Promise<null | { war: object, isCwl: true, cwlDay: number, cwlTotalDays: number }>}
  */
 async function findOurCwlWar() {
   let group;
@@ -23,6 +22,10 @@ async function findOurCwlWar() {
 
   const ourTag = normalizeTag(config.clanTag);
   const totalDays = rounds.length;
+  const season =
+    group.season != null
+      ? String(group.season)
+      : `clan_${ourTag}_${totalDays}`;
 
   let endedFallback = null;
 
@@ -52,6 +55,8 @@ async function findOurCwlWar() {
           isCwl: true,
           cwlDay: day,
           cwlTotalDays: totalDays,
+          cwlSeason: season,
+          groupState: group.state || null,
         };
 
         if (war.state === 'preparation' || war.state === 'inWar') {
@@ -70,12 +75,27 @@ async function findOurCwlWar() {
   return endedFallback;
 }
 
+async function isInCwl() {
+  try {
+    const found = await findOurCwlWar();
+    return Boolean(found && found.war);
+  } catch {
+    return false;
+  }
+}
+
 function formatCwlDayLabel(cwlDay, cwlTotalDays) {
   if (!cwlDay || !cwlTotalDays) return '';
   return `روز ${cwlDay} از ${cwlTotalDays}`;
 }
 
+function buildCwlLeagueKey(season) {
+  return `cwl_league_${normalizeTag(String(season || 'unknown'))}`;
+}
+
 module.exports = {
   findOurCwlWar,
+  isInCwl,
   formatCwlDayLabel,
+  buildCwlLeagueKey,
 };
