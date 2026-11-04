@@ -11,8 +11,13 @@ const {
   parseClashTime,
   getAttacksPerMember,
 } = require('../utils/helpers');
+const config = require('../config');
+const { checkCommandLimit } = require('../utils/commandRateLimit');
+const { singleflight } = require('../utils/singleflight');
+const { getCache, setCache } = require('../utils/ttlCache');
+const { withTelegramRetry } = require('../utils/telegramSafe');
 
-async function resolveActiveWar() {
+async function fetchActiveWar() {
   try {
     const war = await getCurrentWar();
     if (war && war.state && war.state !== 'notInWar') {
@@ -31,6 +36,21 @@ async function resolveActiveWar() {
   }
 
   return null;
+}
+
+/** کش کوتاه + singleflight برای جلوگیری از درخواست تکراری/هم‌زمان */
+async function resolveActiveWar() {
+  const cacheKey = `activeWar:${config.clanTag}`;
+  const cached = getCache(cacheKey);
+  if (cached !== null) return cached;
+
+  return singleflight(cacheKey, async () => {
+    const again = getCache(cacheKey);
+    if (again !== null) return again;
+    const result = await fetchActiveWar();
+    setCache(cacheKey, result, config.warCacheTtlMs);
+    return result;
+  });
 }
 
 function keyboardOur() {
@@ -228,11 +248,15 @@ async function buildEnemyHtml(resolved) {
 }
 
 async function sendRich(ctx, html, replyMarkup) {
-  return ctx.telegram.callApi('sendRichMessage', {
-    chat_id: ctx.chat.id,
-    rich_message: { html, is_rtl: true },
-    reply_markup: replyMarkup,
-  });
+  return withTelegramRetry(
+    () =>
+      ctx.telegram.callApi('sendRichMessage', {
+        chat_id: ctx.chat.id,
+        rich_message: { html, is_rtl: true },
+        reply_markup: replyMarkup,
+      }),
+    { maxRetries: config.telegramMaxRetries }
+  );
 }
 
 async function editRich(ctx, html, replyMarkup) {
@@ -242,12 +266,16 @@ async function editRich(ctx, html, replyMarkup) {
   }
 
   try {
-    await ctx.telegram.callApi('editRichMessage', {
-      chat_id: msg.chat.id,
-      message_id: msg.message_id,
-      rich_message: { html, is_rtl: true },
-      reply_markup: replyMarkup,
-    });
+    await withTelegramRetry(
+      () =>
+        ctx.telegram.callApi('editRichMessage', {
+          chat_id: msg.chat.id,
+          message_id: msg.message_id,
+          rich_message: { html, is_rtl: true },
+          reply_markup: replyMarkup,
+        }),
+      { maxRetries: config.telegramMaxRetries }
+    );
     return;
   } catch (err) {
     console.warn('[/war] editRichMessage failed:', err.message);
@@ -261,6 +289,21 @@ async function editRich(ctx, html, replyMarkup) {
 
 async function warCommand(ctx) {
   try {
+    const userId = ctx.from?.id;
+    const isOwner = userId != null && Number(userId) === Number(config.ownerTelegramId);
+    const limit = checkCommandLimit(userId, 'war', {
+      limit: config.warCmdLimit,
+      windowMs: config.warCmdWindowMs,
+      isOwner,
+    });
+    if (!limit.allowed) {
+      return ctx.reply(
+        `⏳ تعداد درخواست‌های /war زیاد است.\n` +
+          `لطفاً حدود <b>${limit.retryAfterSec}</b> ثانیه دیگر دوباره تلاش کنید.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
     const resolved = await resolveActiveWar();
     if (!resolved || !resolved.war) {
       return ctx.reply('در حال حاضر کلن در وار نیست.');
