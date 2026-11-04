@@ -1,5 +1,8 @@
 const { getClan } = require('../api/clash');
 const { escapeHtml, formatTag, stripEmojis } = require('../utils/helpers');
+const config = require('../config');
+const { checkCommandLimit } = require('../utils/commandRateLimit');
+const { withTelegramRetry } = require('../utils/telegramSafe');
 
 function typeLabel(type) {
   switch (type) {
@@ -43,6 +46,20 @@ function row(label, value) {
 
 module.exports = async function clanCommand(ctx) {
   try {
+    const userId = ctx.from?.id;
+    const isOwner = userId != null && Number(userId) === Number(config.ownerTelegramId);
+    const limit = checkCommandLimit(userId, 'clan', {
+      limit: config.clanCmdLimit,
+      windowMs: config.clanCmdWindowMs,
+      isOwner,
+    });
+    if (!limit.allowed) {
+      return ctx.reply(
+        `⏳ تعداد درخواست‌های /clan زیاد است.\nلطفاً حدود <b>${limit.retryAfterSec}</b> ثانیه دیگر تلاش کنید.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
     const clan = await getClan();
 
     const name = stripEmojis(clan.name || '—') || '—';
@@ -129,13 +146,17 @@ module.exports = async function clanCommand(ctx) {
     `.trim();
 
     try {
-      return await ctx.telegram.callApi('sendRichMessage', {
-        chat_id: ctx.chat.id,
-        rich_message: {
-          html,
-          is_rtl: true,
-        },
-      });
+      return await withTelegramRetry(
+        () =>
+          ctx.telegram.callApi('sendRichMessage', {
+            chat_id: ctx.chat.id,
+            rich_message: {
+              html,
+              is_rtl: true,
+            },
+          }),
+        { maxRetries: config.telegramMaxRetries }
+      );
     } catch (richErr) {
       console.warn('[/clan] rich message failed, fallback HTML:', richErr.message);
       const fallback = `
