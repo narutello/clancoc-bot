@@ -5,14 +5,24 @@ const { withTelegramRetry } = require('./telegramSafe');
 let botInstance = null;
 
 const recent = [];
-const MAX_PER_WINDOW = 30;
-const WINDOW_MS = 5 * 60 * 1000;
-const MAX_LEN = 3500;
+const MAX_PER_WINDOW = Number(process.env.LOG_TG_MAX_PER_WINDOW) || 40;
+const WINDOW_MS = Number(process.env.LOG_TG_WINDOW_MS) || 5 * 60 * 1000;
+const MAX_LEN = 3900;
+
+const LEVEL_ORDER = { debug: 10, info: 20, warn: 30, error: 40 };
+const consoleMin = (process.env.LOG_LEVEL || 'debug').toLowerCase();
+const tgMin = (process.env.LOG_TG_MIN_LEVEL || 'info').toLowerCase();
+
+function levelAllowed(level, minName) {
+  const a = LEVEL_ORDER[level] ?? 20;
+  const b = LEVEL_ORDER[minName] ?? 20;
+  return a >= b;
+}
 
 function setBot(bot) {
   botInstance = bot;
   console.log(
-    `[TGLogger] bot attached; LOG_TELEGRAM_ID=${config.logTelegramId || '(not set)'}`
+    `[logger] bot attached | channel=${config.logTelegramId || 'not set'}`
   );
 }
 
@@ -35,23 +45,86 @@ function markSent() {
   recent.push(Date.now());
 }
 
-function escapeText(text) {
-  return String(text ?? '');
+function nowStamp() {
+  return new Date().toLocaleString('en-GB', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
 }
 
-function formatMessage(level, message, extra) {
-  const icon =
-    level === 'error' ? '🔴' : level === 'warn' ? '🟡' : level === 'info' ? '🔵' : '⚪';
-  const time = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Tehran' });
-  let body = `${icon} [${level.toUpperCase()}] ${escapeText(message)}`;
-  body += `\n${time}`;
-  if (extra !== undefined && extra !== null && extra !== '') {
-    const extraStr =
-      typeof extra === 'string' ? extra : JSON.stringify(extra);
-    body += `\n${String(extraStr).slice(0, 1500)}`;
+function iconFor(level) {
+  switch (level) {
+    case 'error':
+      return '🔴';
+    case 'warn':
+      return '🟡';
+    case 'info':
+      return '🔵';
+    case 'debug':
+      return '⚪';
+    default:
+      return '⚪';
   }
-  if (body.length > MAX_LEN) body = body.slice(0, MAX_LEN) + '...';
+}
+
+function stringifyExtra(extra) {
+  if (extra === undefined || extra === null || extra === '') return null;
+  if (typeof extra === 'string') return extra;
+  if (extra instanceof Error) {
+    return `${extra.message}${extra.stack ? `\n${extra.stack}` : ''}`;
+  }
+  try {
+    return JSON.stringify(extra, null, 2);
+  } catch {
+    return String(extra);
+  }
+}
+
+function formatTelegram(level, message, extra, meta = {}) {
+  const icon = iconFor(level);
+  const mod = meta.module ? ` · ${meta.module}` : '';
+  const lines = [
+    `${icon}  ${level.toUpperCase()}${mod}`,
+    `🕒 ${nowStamp()} (Tehran)`,
+    '',
+    String(message || ''),
+  ];
+
+  const extraStr = stringifyExtra(extra);
+  if (extraStr) {
+    lines.push('');
+    lines.push('── detail ──');
+    lines.push(extraStr.slice(0, 2800));
+  }
+
+  if (meta.context && typeof meta.context === 'object') {
+    lines.push('');
+    lines.push('── context ──');
+    try {
+      lines.push(JSON.stringify(meta.context, null, 2).slice(0, 800));
+    } catch {
+      lines.push(String(meta.context));
+    }
+  }
+
+  let body = lines.join('\n');
+  if (body.length > MAX_LEN) body = `${body.slice(0, MAX_LEN)}…`;
   return body;
+}
+
+function formatConsole(level, message, extra, meta = {}) {
+  const mod = meta.module ? `[${meta.module}] ` : '';
+  const base = `[${level.toUpperCase()}] ${mod}${message}`;
+  const extraStr = stringifyExtra(extra);
+  if (!extraStr) return base;
+  if (extraStr.includes('\n')) return `${base}\n${extraStr}`;
+  return `${base} | ${extraStr}`;
 }
 
 async function sendViaHttpApi(chatId, text) {
@@ -61,7 +134,7 @@ async function sendViaHttpApi(chatId, text) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: chatId,
-      text: String(text).slice(0, 4000),
+      text: String(text).slice(0, 4096),
       disable_web_page_preview: true,
     }),
   });
@@ -76,11 +149,11 @@ async function sendViaHttpApi(chatId, text) {
 async function sendRaw(text, { silent = false } = {}) {
   const chatId = getLogChatId();
   if (!chatId) {
-    if (!silent) console.warn('[TGLogger] skip: LOG_TELEGRAM_ID is empty');
+    if (!silent) console.warn('[logger] skip TG: LOG_TELEGRAM_ID not set');
     return false;
   }
   if (!canSend()) {
-    console.warn('[TGLogger] skip: rate limit');
+    console.warn('[logger] skip TG: rate limit reached');
     return false;
   }
 
@@ -88,7 +161,7 @@ async function sendRaw(text, { silent = false } = {}) {
     try {
       await withTelegramRetry(
         () =>
-          botInstance.telegram.sendMessage(chatId, String(text).slice(0, 4000), {
+          botInstance.telegram.sendMessage(chatId, String(text).slice(0, 4096), {
             disable_web_page_preview: true,
           }),
         { maxRetries: config.telegramMaxRetries || 3 }
@@ -96,53 +169,62 @@ async function sendRaw(text, { silent = false } = {}) {
       markSent();
       return true;
     } catch (err) {
-      console.error('[TGLogger] telegraf send failed:', err.message);
+      console.error('[logger] telegraf send failed:', err.message);
     }
   }
 
   try {
     await sendViaHttpApi(chatId, text);
     markSent();
-    console.log('[TGLogger] sent via HTTP API fallback');
     return true;
   } catch (err) {
-    console.error('[TGLogger] HTTP API send failed:', err.message);
+    console.error('[logger] HTTP API send failed:', err.message);
     return false;
   }
 }
 
-async function log(level, message, extra) {
-  const line = `[${level.toUpperCase()}] ${message}${
-    extra !== undefined && extra !== null
-      ? ' ' + (typeof extra === 'string' ? extra : JSON.stringify(extra))
-      : ''
-  }`;
-  if (level === 'error') console.error(line);
-  else if (level === 'warn') console.warn(line);
-  else console.log(line);
+async function log(level, message, extra, meta = {}) {
+  const msg = String(message ?? '');
 
-  if (level === 'error' || level === 'warn' || level === 'info') {
-    await sendRaw(formatMessage(level, message, extra));
+  if (levelAllowed(level, consoleMin)) {
+    const line = formatConsole(level, msg, extra, meta);
+    if (level === 'error') console.error(line);
+    else if (level === 'warn') console.warn(line);
+    else console.log(line);
+  }
+
+  const wantTg =
+    meta.tg !== false &&
+    levelAllowed(level, tgMin) &&
+    (level === 'error' || level === 'warn' || level === 'info');
+
+  if (wantTg) {
+    await sendRaw(formatTelegram(level, msg, extra, meta), { silent: true });
   }
 }
 
 async function sendStartupBanner() {
   const chatId = getLogChatId();
-  console.log(`[TGLogger] sendStartupBanner chatId=${chatId || '(none)'}`);
+  console.log(`[logger] startup banner → ${chatId || '(no channel)'}`);
   if (!chatId) {
-    console.warn('[TGLogger] LOG_TELEGRAM_ID not configured');
+    console.warn('[logger] LOG_TELEGRAM_ID not configured');
     return false;
   }
 
-  const text =
-    `🤖 ClanCoC Bot online\n` +
-    `Clan: #${config.clanTag}\n` +
-    `Group: ${config.telegramGroupId || '-'}\n` +
-    `Log: ${chatId}\n` +
-    `Poll: ${config.warPollIntervalMs}ms`;
+  const text = [
+    '🤖  ClanCoC Bot — ONLINE',
+    `🕒 ${nowStamp()} (Tehran)`,
+    '',
+    `Clan     #${config.clanTag}`,
+    `Owner    ${config.ownerTelegramId}`,
+    `Group    ${config.telegramGroupId || '-'}`,
+    `Log      ${chatId}`,
+    `Poll     ${config.warPollIntervalMs}ms`,
+    `API      ${config.clashApiBaseUrl}`,
+  ].join('\n');
 
   const ok = await sendRaw(text);
-  console.log(`[TGLogger] startup banner sent=${ok}`);
+  console.log(`[logger] startup banner sent=${ok}`);
   return ok;
 }
 
@@ -150,9 +232,11 @@ const tgLog = {
   setBot,
   sendStartupBanner,
   sendRaw,
-  error: (msg, extra) => log('error', msg, extra),
-  warn: (msg, extra) => log('warn', msg, extra),
-  info: (msg, extra) => log('info', msg, extra),
+  debug: (msg, extra, meta) => log('debug', msg, extra, meta),
+  info: (msg, extra, meta) => log('info', msg, extra, meta),
+  warn: (msg, extra, meta) => log('warn', msg, extra, meta),
+  error: (msg, extra, meta) => log('error', msg, extra, meta),
+  log,
 };
 
-module.exports = { tgLog, setBot };
+module.exports = { tgLog, setBot: tgLog.setBot };
