@@ -53,34 +53,15 @@ async function getLastState() {
 async function saveState(data) {
   await query(
     `UPDATE war_state SET
-      state = $1,
-      war_tag = $2,
-      opponent_tag = $3,
-      team_size = $4,
-      preparation_start = $5,
-      start_time = $6,
-      end_time = $7,
-      our_stars = $8,
-      their_stars = $9,
-      our_destruction = $10,
-      their_destruction = $11,
-      members_json = $12,
-      attacks_json = $13,
-      is_cwl = $14,
-      updated_at = NOW()
+      state = $1, war_tag = $2, opponent_tag = $3, team_size = $4,
+      preparation_start = $5, start_time = $6, end_time = $7,
+      our_stars = $8, their_stars = $9, our_destruction = $10, their_destruction = $11,
+      members_json = $12, attacks_json = $13, is_cwl = $14, updated_at = NOW()
      WHERE id = 1`,
     [
-      data.state,
-      data.warTag || null,
-      data.opponentTag || null,
-      data.teamSize || null,
-      data.preparationStart || null,
-      data.startTime || null,
-      data.endTime || null,
-      data.ourStars ?? null,
-      data.theirStars ?? null,
-      data.ourDestruction ?? null,
-      data.theirDestruction ?? null,
+      data.state, data.warTag || null, data.opponentTag || null, data.teamSize || null,
+      data.preparationStart || null, data.startTime || null, data.endTime || null,
+      data.ourStars ?? null, data.theirStars ?? null, data.ourDestruction ?? null, data.theirDestruction ?? null,
       data.membersJson ? JSON.stringify(data.membersJson) : null,
       data.attacksJson ? JSON.stringify(data.attacksJson) : null,
       data.isCwl || false,
@@ -91,8 +72,7 @@ async function saveState(data) {
 function buildWarKey(war) {
   if (!war || war.state === 'notInWar') return 'notInWar';
   const opp = normalizeTag(war.opponent?.tag || 'unknown');
-  const start =
-    parseClashTime(war.preparationStartTime) || parseClashTime(war.startTime);
+  const start = parseClashTime(war.preparationStartTime) || parseClashTime(war.startTime);
   const t = start ? start.getTime() : 0;
   return `${opp}_${t}`;
 }
@@ -121,9 +101,7 @@ function extractMembers(war) {
 
 function countAttacks(members) {
   let used = 0;
-  for (const m of members) {
-    used += (m.attacks || []).length;
-  }
+  for (const m of members) used += (m.attacks || []).length;
   return used;
 }
 
@@ -140,11 +118,8 @@ async function buildMembersTableRows(members, attacksPerMember = 2) {
       const defStars = m.bestOpponentAttack?.stars ?? 0;
       const links = linksMap.get(m.tag) || [];
       let nameCell;
-      if (links.length > 0) {
-        nameCell = links.map((u) => tgUserLink(u.telegram_id, m.name)).join(' / ');
-      } else {
-        nameCell = escapeHtml(m.name || formatTag(m.tag));
-      }
+      if (links.length > 0) nameCell = links.map((u) => tgUserLink(u.telegram_id, m.name)).join(' / ');
+      else nameCell = escapeHtml(m.name || formatTag(m.tag));
       const th = m.townhallLevel ?? m.townHallLevel ?? '—';
       const rowNum = index + 1;
       return `<tr><td>${rowNum}</td><td>${nameCell}</td><td>${th}</td><td>${attacks.length}/${attacksPerMember}</td><td>${stars} ⭐</td><td>${defStars} ⭐</td></tr>`;
@@ -195,7 +170,7 @@ ${rows}
 async function sendToGroup(bot, html) {
   if (!config.telegramGroupId) {
     console.warn('[WarMonitor] TELEGRAM_GROUP_ID not set, skipping notification');
-    await tgLog.warn('TELEGRAM_GROUP_ID تنظیم نشده؛ اعلان گروه ارسال نشد');
+    await tgLog.warn('TELEGRAM_GROUP_ID not set; group notification skipped', null, { module: 'WarMonitor' });
     return;
   }
   try {
@@ -209,50 +184,45 @@ async function sendToGroup(bot, html) {
     );
   } catch (err) {
     console.error('[WarMonitor] Failed to send rich message:', err.message);
-    await tgLog.error('ارسال Rich Message به گروه ناموفق', err.message);
+    await tgLog.error('Failed to send rich message to group', err.message, { module: 'WarMonitor' });
     try {
       await withTelegramRetry(
         () =>
           bot.telegram.sendMessage(
             config.telegramGroupId,
-            'اعلان وار (نسخه کلاینت از Rich Message پشتیبانی نمی‌کند)',
+            'War notice (client does not support Rich Message)',
             { disable_web_page_preview: true }
           ),
         { maxRetries: config.telegramMaxRetries }
       );
     } catch (e2) {
       console.error('[WarMonitor] Fallback also failed:', e2.message);
-      await tgLog.error('Fallback ارسال گروه هم ناموفق', e2.message);
+      await tgLog.error('Fallback group message also failed', e2.message, { module: 'WarMonitor' });
     }
   }
 }
 
-/** فقط وار معمولی */
 async function notifyPreparation(bot, war) {
   const warKey = buildWarKey(war);
   const event = 'preparation';
   if (await hasNotification(warKey, event)) return;
-
   const title = '⚔️ حریف پیدا شد — آماده‌سازی شروع شد!';
   const html = await buildWarRichHtml(war, title, '', null);
   await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: حریف/آماده‌سازی');
+  await tgLog.info('Notification sent: preparation started', null, { module: 'WarMonitor' });
   await markNotification(warKey, event);
 }
 
-/** فقط یک‌بار در شروع لیگ (روز ۱ آماده‌سازی) */
 async function notifyCwlLeagueStart(bot, war, meta) {
   if (!meta || meta.cwlDay !== 1) return;
   if (!war || war.state !== 'preparation') return;
-
   const leagueKey = buildCwlLeagueKey(meta.cwlSeason);
   const event = 'cwl_league_preparation';
   if (await hasNotification(leagueKey, event)) return;
-
   const title = '🏟 لیگ کلن‌ها شروع شد — آماده‌سازی روز اول';
   const html = await buildWarRichHtml(war, title, '', meta);
   await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: شروع لیگ CWL (آماده‌سازی روز ۱)');
+  await tgLog.info('Notification sent: CWL league start (day 1 preparation)', null, { module: 'WarMonitor' });
   await markNotification(leagueKey, event);
 }
 
@@ -267,7 +237,7 @@ async function notifyBattleStart(bot, war, isCwl = false) {
   const title = `🔥 روز نبرد شروع شد!${isCwl ? ' (CWL)' : ''}`;
   const html = await buildWarRichHtml(war, title, extra, war.__cwlMeta || null);
   await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: شروع نبرد' + (isCwl ? ' (CWL)' : ''));
+  await tgLog.info('Notification sent: battle started' + (isCwl ? ' (CWL)' : ''), null, { module: 'WarMonitor' });
   await markNotification(warKey, event);
 }
 
@@ -296,7 +266,7 @@ ${dayLine ? `<p>${dayLine.trim()}</p>` : ''}
 </table>
 <p>حمله‌هاتون رو فراموش نکنید.</p>`.trim();
   await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: ۱ ساعت مانده' + (isCwl ? ' (CWL)' : ''));
+  await tgLog.info('Notification sent: 1 hour left' + (isCwl ? ' (CWL)' : ''), null, { module: 'WarMonitor' });
   await markNotification(warKey, event);
 }
 
@@ -324,7 +294,7 @@ async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
 </table>
 <p>نتیجه: <b>${resultLabel(result)}</b></p>`.trim();
   await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: پایان وار (ذخیره‌شده)' + (isCwl ? ' (CWL)' : ''));
+  await tgLog.info('Notification sent: war ended (from saved state)' + (isCwl ? ' (CWL)' : ''), null, { module: 'WarMonitor' });
   await markNotification(warKey, event);
 }
 
@@ -343,7 +313,7 @@ async function notifyWarEnded(bot, war, isCwl = false) {
   const title = `🏁 وار به پایان رسید!${isCwl ? ' (CWL)' : ''}`;
   const html = await buildWarRichHtml(war, title, extra, war.__cwlMeta || null);
   await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: پایان وار' + (isCwl ? ' (CWL)' : ''));
+  await tgLog.info('Notification sent: war ended' + (isCwl ? ' (CWL)' : ''), null, { module: 'WarMonitor' });
   await markNotification(warKey, event);
 }
 
@@ -364,16 +334,12 @@ async function checkRegularWar(bot) {
     return { state: 'notInWar', isCwl: false };
   }
   const members = extractMembers(war);
-  if (war.state === 'preparation') {
-    await notifyPreparation(bot, war);
-  }
+  if (war.state === 'preparation') await notifyPreparation(bot, war);
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, false);
     await notifyOneHourLeft(bot, war, false);
   }
-  if (war.state === 'warEnded') {
-    await notifyWarEnded(bot, war, false);
-  }
+  if (war.state === 'warEnded') await notifyWarEnded(bot, war, false);
   await saveState({
     state: war.state,
     warTag: war.tag || null,
@@ -398,34 +364,19 @@ async function checkCwl(bot) {
     found = await findOurCwlWar();
   } catch (err) {
     console.warn('[WarMonitor] CWL lookup failed:', err.message);
-    await tgLog.warn('CWL lookup failed', err.message);
+    await tgLog.warn('CWL lookup failed', err.message, { module: 'WarMonitor' });
     return null;
   }
-
   if (!found || !found.war) return null;
-
   const war = found.war;
-  const meta = {
-    cwlDay: found.cwlDay,
-    cwlTotalDays: found.cwlTotalDays,
-    cwlSeason: found.cwlSeason,
-  };
+  const meta = { cwlDay: found.cwlDay, cwlTotalDays: found.cwlTotalDays, cwlSeason: found.cwlSeason };
   war.__cwlMeta = meta;
-
-  // آماده‌سازی: فقط روز اول لیگ، یک‌بار در کل فصل
-  if (war.state === 'preparation') {
-    await notifyCwlLeagueStart(bot, war, meta);
-  }
-
-  // شروع / یک ساعت مانده / پایان — هر روز وار جدا
+  if (war.state === 'preparation') await notifyCwlLeagueStart(bot, war, meta);
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, true);
     await notifyOneHourLeft(bot, war, true);
   }
-  if (war.state === 'warEnded') {
-    await notifyWarEnded(bot, war, true);
-  }
-
+  if (war.state === 'warEnded') await notifyWarEnded(bot, war, true);
   await saveState({
     state: war.state,
     warTag: war.tag || null,
@@ -437,7 +388,6 @@ async function checkCwl(bot) {
     ourDestruction: war.clan?.destructionPercentage,
     theirDestruction: war.opponent?.destructionPercentage,
   });
-
   return war;
 }
 
@@ -447,19 +397,22 @@ async function checkWarStatus(bot) {
     const state = war?.state || 'unknown';
     const opp = war?.opponent?.name || war?.opponent?.tag || '-';
     console.log(`[WarMonitor] Check done — state=${state} opponent=${opp}`);
+    await tgLog.debug(`War poll OK — state=${state}`, { opponent: String(opp).slice(0, 80) }, { module: 'WarMonitor' });
     if (state !== lastLoggedWarState) {
       lastLoggedWarState = state;
-      await tgLog.info(`وضعیت وار: ${state}`, { opponent: String(opp).slice(0, 80) });
+      await tgLog.info(`War state changed → ${state}`, { opponent: String(opp).slice(0, 80) }, { module: 'WarMonitor' });
     }
     await checkCwl(bot);
   } catch (err) {
     console.error('[WarMonitor] Error during check:', err.message);
-    await tgLog.error('خطا در چک وار', err.message);
+    console.error(err.stack);
+    await tgLog.error('War check failed', err.stack || err.message, { module: 'WarMonitor' });
   }
 }
 
 function startWarMonitor(bot) {
   console.log(`[WarMonitor] Starting with interval ${config.warPollIntervalMs}ms`);
+  tgLog.info(`War monitor started (interval ${config.warPollIntervalMs}ms)`, null, { module: 'WarMonitor' });
   setTimeout(() => checkWarStatus(bot), 5000);
   const interval = setInterval(() => checkWarStatus(bot), config.warPollIntervalMs);
   if (global.__warMonitorInterval) clearInterval(global.__warMonitorInterval);
