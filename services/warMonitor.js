@@ -20,6 +20,7 @@ const {
 const config = require('../config');
 const { tgLog } = require('../utils/telegramLogger');
 const { findOurCwlWar, formatCwlDayLabel } = require('./cwlService');
+const { withTelegramRetry } = require('../utils/telegramSafe');
 
 let lastLoggedWarState = null;
 
@@ -194,18 +195,26 @@ async function sendToGroup(bot, html) {
     return;
   }
   try {
-    await bot.telegram.callApi('sendRichMessage', {
-      chat_id: config.telegramGroupId,
-      rich_message: { html, is_rtl: true },
-    });
+    await withTelegramRetry(
+      () =>
+        bot.telegram.callApi('sendRichMessage', {
+          chat_id: config.telegramGroupId,
+          rich_message: { html, is_rtl: true },
+        }),
+      { maxRetries: config.telegramMaxRetries }
+    );
   } catch (err) {
     console.error('[WarMonitor] Failed to send rich message:', err.message);
     await tgLog.error('ارسال Rich Message به گروه ناموفق', err.message);
     try {
-      await bot.telegram.sendMessage(
-        config.telegramGroupId,
-        'اعلان وار (نسخه کلاینت از Rich Message پشتیبانی نمی‌کند)',
-        { disable_web_page_preview: true }
+      await withTelegramRetry(
+        () =>
+          bot.telegram.sendMessage(
+            config.telegramGroupId,
+            'اعلان وار (نسخه کلاینت از Rich Message پشتیبانی نمی‌کند)',
+            { disable_web_page_preview: true }
+          ),
+        { maxRetries: config.telegramMaxRetries }
       );
     } catch (e2) {
       console.error('[WarMonitor] Fallback also failed:', e2.message);
