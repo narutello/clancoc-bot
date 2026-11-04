@@ -1,4 +1,5 @@
 const config = require('../config');
+const { withTelegramRetry } = require('./telegramSafe');
 
 /** @type {import('telegraf').Telegraf | null} */
 let botInstance = null;
@@ -85,9 +86,13 @@ async function sendRaw(text, { silent = false } = {}) {
 
   if (botInstance && botInstance.telegram) {
     try {
-      await botInstance.telegram.sendMessage(chatId, String(text).slice(0, 4000), {
-        disable_web_page_preview: true,
-      });
+      await withTelegramRetry(
+        () =>
+          botInstance.telegram.sendMessage(chatId, String(text).slice(0, 4000), {
+            disable_web_page_preview: true,
+          }),
+        { maxRetries: config.telegramMaxRetries || 3 }
+      );
       markSent();
       return true;
     } catch (err) {
