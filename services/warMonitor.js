@@ -19,7 +19,11 @@ const {
 } = require('../utils/helpers');
 const config = require('../config');
 const { tgLog } = require('../utils/telegramLogger');
-const { findOurCwlWar, formatCwlDayLabel } = require('./cwlService');
+const {
+  findOurCwlWar,
+  formatCwlDayLabel,
+  buildCwlLeagueKey,
+} = require('./cwlService');
 const { withTelegramRetry } = require('../utils/telegramSafe');
 
 let lastLoggedWarState = null;
@@ -223,15 +227,33 @@ async function sendToGroup(bot, html) {
   }
 }
 
-async function notifyPreparation(bot, war, isCwl = false) {
+/** فقط وار معمولی */
+async function notifyPreparation(bot, war) {
   const warKey = buildWarKey(war);
-  const event = isCwl ? 'cwl_preparation' : 'preparation';
+  const event = 'preparation';
   if (await hasNotification(warKey, event)) return;
-  const title = `⚔️ حریف پیدا شد — آماده‌سازی شروع شد!${isCwl ? ' (CWL)' : ''}`;
-  const html = await buildWarRichHtml(war, title, '', war.__cwlMeta || null);
+
+  const title = '⚔️ حریف پیدا شد — آماده‌سازی شروع شد!';
+  const html = await buildWarRichHtml(war, title, '', null);
   await sendToGroup(bot, html);
-  await tgLog.info('اعلان ارسال شد: حریف/آماده‌سازی' + (isCwl ? ' (CWL)' : ''));
+  await tgLog.info('اعلان ارسال شد: حریف/آماده‌سازی');
   await markNotification(warKey, event);
+}
+
+/** فقط یک‌بار در شروع لیگ (روز ۱ آماده‌سازی) */
+async function notifyCwlLeagueStart(bot, war, meta) {
+  if (!meta || meta.cwlDay !== 1) return;
+  if (!war || war.state !== 'preparation') return;
+
+  const leagueKey = buildCwlLeagueKey(meta.cwlSeason);
+  const event = 'cwl_league_preparation';
+  if (await hasNotification(leagueKey, event)) return;
+
+  const title = '🏟 لیگ کلن‌ها شروع شد — آماده‌سازی روز اول';
+  const html = await buildWarRichHtml(war, title, '', meta);
+  await sendToGroup(bot, html);
+  await tgLog.info('اعلان ارسال شد: شروع لیگ CWL (آماده‌سازی روز ۱)');
+  await markNotification(leagueKey, event);
 }
 
 async function notifyBattleStart(bot, war, isCwl = false) {
@@ -343,7 +365,7 @@ async function checkRegularWar(bot) {
   }
   const members = extractMembers(war);
   if (war.state === 'preparation') {
-    await notifyPreparation(bot, war, false);
+    await notifyPreparation(bot, war);
   }
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, false);
@@ -383,14 +405,19 @@ async function checkCwl(bot) {
   if (!found || !found.war) return null;
 
   const war = found.war;
-  war.__cwlMeta = {
+  const meta = {
     cwlDay: found.cwlDay,
     cwlTotalDays: found.cwlTotalDays,
+    cwlSeason: found.cwlSeason,
   };
+  war.__cwlMeta = meta;
 
+  // آماده‌سازی: فقط روز اول لیگ، یک‌بار در کل فصل
   if (war.state === 'preparation') {
-    await notifyPreparation(bot, war, true);
+    await notifyCwlLeagueStart(bot, war, meta);
   }
+
+  // شروع / یک ساعت مانده / پایان — هر روز وار جدا
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, true);
     await notifyOneHourLeft(bot, war, true);
@@ -407,6 +434,8 @@ async function checkCwl(bot) {
     isCwl: true,
     ourStars: war.clan?.stars,
     theirStars: war.opponent?.stars,
+    ourDestruction: war.clan?.destructionPercentage,
+    theirDestruction: war.opponent?.destructionPercentage,
   });
 
   return war;
