@@ -38,7 +38,18 @@ function createBot() {
 
   bot.catch(async (err, ctx) => {
     console.error(`[Bot] Error for ${ctx.updateType}:`, err.message);
-    await tgLog.error(`Bot error (${ctx.updateType})`, err.message);
+    await tgLog.error(
+      `Bot error (${ctx.updateType})`,
+      err.stack || err.message,
+      {
+        module: 'Bot',
+        context: {
+          updateType: ctx.updateType,
+          chatId: ctx.chat?.id,
+          userId: ctx.from?.id,
+        },
+      }
+    );
     try {
       await ctx.reply('⚠️ خطایی رخ داد. لطفاً بعداً دوباره تلاش کنید.');
     } catch (_) {}

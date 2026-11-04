@@ -41,7 +41,6 @@ async function main() {
   const bot = createBot();
   tgLog.setBot(bot);
 
-  // مهم: launch را await نکن — در بعضی محیط‌ها Promise تمام نمی‌شود
   bot
     .launch()
     .then(() => {
@@ -53,6 +52,15 @@ async function main() {
     });
 
   console.log('[OK] Bot launch initiated');
+  await tgLog.info(
+    'Bot launch initiated',
+    {
+      clan: config.clanTag,
+      group: config.telegramGroupId,
+      pollMs: config.warPollIntervalMs,
+    },
+    { module: 'Boot' }
+  );
   console.log(`[INFO] Owner ID: ${config.ownerTelegramId}`);
   console.log(`[INFO] Clan Tag: #${config.clanTag}`);
   console.log(`[INFO] Group ID: ${config.telegramGroupId || 'not set'}`);
@@ -82,7 +90,7 @@ async function main() {
   const stop = async (signal) => {
     console.log(`\nReceived ${signal}, shutting down...`);
     try {
-      await tgLog.warn(`Shutting down (${signal})`);
+      await tgLog.warn(`Shutting down (${signal})`, null, { module: 'Boot' });
     } catch (_) {}
     try {
       bot.stop(signal);

@@ -16,11 +16,15 @@ module.exports = async function testLogCommand(ctx) {
   try {
     await ctx.telegram.sendMessage(
       config.logTelegramId,
-      '✅ تست کانال لاگ\nاگر این پیام را می‌بینید، LOG_TELEGRAM_ID درست است.\n🤖 ClanCoC Bot — Log Test OK',
+      '✅ Log channel test\nIf you see this, LOG_TELEGRAM_ID is correct.\n🤖 ClanCoC Bot — Log Test OK',
       { disable_web_page_preview: true }
     );
 
-    await tgLog.info('تست دستی کانال لاگ موفق بود');
+    await tgLog.info(
+      'Manual log channel test OK',
+      { from: ctx.from?.id },
+      { module: 'TestLog' }
+    );
 
     return ctx.reply(
       `✅ پیام تست به کانال لاگ ارسال شد.\nLog ID: <code>${config.logTelegramId}</code>`,
@@ -28,13 +32,7 @@ module.exports = async function testLogCommand(ctx) {
     );
   } catch (err) {
     console.error('[/testlog]', err.message);
-    return ctx.reply(
-      `❌ ارسال به کانال لاگ ناموفق بود:\n<code>${err.message}</code>\n\n` +
-        `بررسی کنید:\n` +
-        `• LOG_TELEGRAM_ID درست باشد (معمولاً با -100)\n` +
-        `• ربات ادمین کانال باشد\n` +
-        `• اجازه Post Messages داشته باشد`,
-      { parse_mode: 'HTML' }
-    );
+    await tgLog.error('Manual log test failed', err.message, { module: 'TestLog' });
+    return ctx.reply(`❌ خطا در ارسال به کانال لاگ:\n${err.message}`);
   }
 };
