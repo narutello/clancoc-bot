@@ -14,6 +14,7 @@ const { warEnemyAction, warHomeAction } = warCommand;
 const cwlCommand = require('../commands/cwl');
 const { cwlEnemyAction, cwlHomeAction } = cwlCommand;
 const clanCommand = require('../commands/clan');
+const statusCommand = require('../commands/status');
 const testNotifyCommand = require('../commands/testnotify');
 const testLogCommand = require('../commands/testlog');
 
@@ -45,6 +46,7 @@ function createBot() {
   bot.action('cwl:enemy', cwlEnemyAction);
   bot.action('cwl:home', cwlHomeAction);
   bot.command('clan', clanCommand);
+  bot.command('status', statusCommand);
   bot.command('testnotify', testNotifyCommand);
   bot.command('testlog', testLogCommand);
 
