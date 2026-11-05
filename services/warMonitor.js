@@ -114,7 +114,7 @@ function getPendingAttackers(members, attacksPerMember) {
     .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0));
 }
 
-/** HTML table of players with remaining attacks (Telegram links when available) */
+/** HTML table of pending attackers: game name unchanged + separate mention column */
 async function buildPendingAttackersHtml(members, attacksPerMember) {
   const pending = getPendingAttackers(members, attacksPerMember);
   if (pending.length === 0) {
@@ -129,22 +129,39 @@ async function buildPendingAttackersHtml(members, attacksPerMember) {
     .map((m, index) => {
       const used = (m.attacks || []).length;
       const links = linksMap.get(m.tag) || [];
-      let nameCell;
+      // Game name stays plain / unchanged
+      const nameCell = escapeHtml(m.name || formatTag(m.tag));
+
+      let mentionCell = '—';
       if (links.length > 0) {
-        nameCell = links
-          .map((u) => tgUserLink(u.telegram_id, m.name))
+        mentionCell = links
+          .map((u) => {
+            if (u.username) {
+              return (
+                `<a href="tg://user?id=${u.telegram_id}">@${escapeHtml(u.username)}</a>`
+              );
+            }
+            const label = u.first_name || 'منشن';
+            return tgUserLink(u.telegram_id, label);
+          })
           .join(' / ');
-      } else {
-        nameCell = escapeHtml(m.name || formatTag(m.tag));
       }
-      return `<tr><td>${index + 1}</td><td>${nameCell}</td><td>${used}/${max}</td></tr>`;
+
+      return (
+        `<tr>` +
+        `<td>${index + 1}</td>` +
+        `<td>${nameCell}</td>` +
+        `<td>${mentionCell}</td>` +
+        `<td>${used}/${max}</td>` +
+        `</tr>`
+      );
     })
     .join('');
 
   return (
     `<p>⚠️ حمله باقی‌مانده: <b>${pending.length}</b> نفر</p>` +
     `<table bordered striped compact>` +
-    `<tr><th>#</th><th>بازیکن</th><th>حمله</th></tr>` +
+    `<tr><th>#</th><th>بازیکن</th><th>منشن</th><th>حمله</th></tr>` +
     rows +
     `</table>`
   );
