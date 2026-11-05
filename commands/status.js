@@ -73,7 +73,6 @@ module.exports = async function statusCommand(ctx) {
   lines.push(`⏱ Uptime: حدود ${escapeHtml(formatUptime(process.uptime()))}`);
   lines.push(`📡 Polling: هر ${Math.round(config.warPollIntervalMs / 1000)} ثانیه`);
 
-  // DB health + last war_state update
   let dbOk = false;
   let lastCheck = null;
   try {
@@ -89,7 +88,6 @@ module.exports = async function statusCommand(ctx) {
     lines.push(`🔄 آخرین به‌روزرسانی state: ${escapeHtml(formatAgo(lastCheck))}`);
   }
 
-  // Clash API probe
   let apiOk = false;
   let apiErr = null;
   try {
@@ -187,7 +185,6 @@ module.exports = async function statusCommand(ctx) {
     lines.push(`⚔️ حمله‌ها: <b>${used}/${maxAtk}</b>`);
     lines.push(`⚠️ بدون حمله کامل: <b>${pending}</b> نفر`);
 
-    // Linked war members
     try {
       const tags = members.map((m) => m.tag).filter(Boolean);
       const map = await getLinksForTags(tags);
@@ -253,7 +250,7 @@ module.exports = async function statusCommand(ctx) {
   );
   lines.push(`💾 War cache TTL: ${config.warCacheTtlMs}ms`);
 
-  return ctx.reply(lines.join('\n'), {
+  return ctx.reply(lines.join(String.fromCharCode(10)), {
     parse_mode: 'HTML',
     disable_web_page_preview: true,
   });
