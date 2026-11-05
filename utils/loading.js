@@ -1,11 +1,11 @@
 /**
  * Loading helpers for slow commands (Clash API / DB).
  *
- * Private chats: Telegram Bot API sendMessageDraft ("Thinking…" bubble).
- * Groups/supergroups/channels: fallback to a normal loading message
- * (sendMessageDraft is private-chat only).
+ * Private chats: Telegram Bot API sendMessageDraft with empty text
+ * → native "Thinking…" bubble (private chats only).
+ * Groups/supergroups/channels: fallback to a normal loading message.
  *
- * The public API stays the same for command handlers:
+ * Public API for command handlers stays unchanged:
  *   sendLoading / deleteLoading / replaceLoadingText
  */
 
@@ -14,9 +14,8 @@ function isPrivateChat(ctx) {
 }
 
 function nextDraftId() {
-  // Must be non-zero integer; reuse same id within one turn for animation.
-  const id = (Date.now() % 2147483646) + 1;
-  return id;
+  // Must be non-zero integer
+  return (Date.now() % 2147483646) + 1;
 }
 
 /**
@@ -28,23 +27,16 @@ function nextDraftId() {
  * }>
  */
 async function sendLoading(ctx, text = '⏳ در حال دریافت اطلاعات...') {
-  // Private → native Thinking / draft preview
+  // Private → native Thinking… via sendMessageDraft
   if (isPrivateChat(ctx)) {
     const draftId = nextDraftId();
     try {
-      // Empty text shows the built-in "Thinking…" placeholder.
-      // If a custom caption is provided, show that draft text instead.
-      const payload = {
+      // Empty text → official "Thinking…" placeholder
+      await ctx.telegram.callApi('sendMessageDraft', {
         chat_id: ctx.chat.id,
         draft_id: draftId,
-      };
-      if (text && String(text).trim()) {
-        payload.text = String(text).trim();
-      } else {
-        payload.text = '';
-      }
-
-      await ctx.telegram.callApi('sendMessageDraft', payload);
+        text: '',
+      });
       return {
         mode: 'draft',
         draftId,
@@ -59,7 +51,7 @@ async function sendLoading(ctx, text = '⏳ در حال دریافت اطلاع�
     }
   }
 
-  // Group / fallback: classic loading message
+  // Group / fallback: classic loading message (draft is private-only)
   try {
     const message = await ctx.reply(text || '⏳ در حال دریافت اطلاعات...');
     return {
@@ -75,14 +67,13 @@ async function sendLoading(ctx, text = '⏳ در حال دریافت اطلاع�
 
 /**
  * Clear loading indicator.
- * Draft mode: no-op (draft disappears when the bot sends a real message).
+ * Draft mode: no-op (draft clears when the bot sends a real message).
  * Message mode: delete the temporary loading message.
  */
 async function deleteLoading(ctx, loading) {
   if (!loading) return;
 
   if (loading.mode === 'draft') {
-    // Ephemeral draft auto-clears when we send the final message.
     return;
   }
 
