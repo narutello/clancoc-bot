@@ -4,6 +4,11 @@ const { checkCommandLimit } = require('../utils/commandRateLimit');
 const { singleflight } = require('../utils/singleflight');
 const { getCache, setCache } = require('../utils/ttlCache');
 const {
+  sendLoading,
+  deleteLoading,
+  replaceLoadingText,
+} = require('../utils/loading');
+const {
   keyboardOur,
   keyboardEnemy,
   buildOurHtml,
@@ -38,6 +43,7 @@ async function resolveCwlWar() {
 }
 
 async function cwlCommand(ctx) {
+  let loadingMsg = null;
   try {
     const userId = ctx.from?.id;
     const isOwner =
@@ -55,15 +61,24 @@ async function cwlCommand(ctx) {
       );
     }
 
+    loadingMsg = await sendLoading(ctx, '⏳ در حال دریافت وضعیت لیگ...');
+
     const resolved = await resolveCwlWar();
     if (!resolved || !resolved.war) {
-      return ctx.reply('در حال حاضر کلن در لیگ کلن‌ها (CWL) نیست.');
+      return replaceLoadingText(
+        ctx,
+        loadingMsg,
+        'در حال حاضر کلن در لیگ کلن‌ها (CWL) نیست.'
+      );
     }
 
     const html = await buildOurHtml(resolved, '🏟 وضعیت لیگ کلن‌ها');
+    await deleteLoading(ctx, loadingMsg);
+    loadingMsg = null;
     return sendRich(ctx, html, keyboardOur('cwl'));
   } catch (err) {
     console.error('[/cwl]', err.message);
+    await deleteLoading(ctx, loadingMsg);
     return richMessageErrorReply(
       ctx,
       err,
@@ -74,13 +89,13 @@ async function cwlCommand(ctx) {
 
 async function cwlEnemyAction(ctx) {
   try {
+    await ctx.answerCbQuery('⏳ در حال بارگذاری...');
     const resolved = await resolveCwlWar();
     if (!resolved || !resolved.war) {
       return ctx.answerCbQuery('در حال حاضر کلن در CWL نیست.', {
         show_alert: true,
       });
     }
-    await ctx.answerCbQuery();
     const html = await buildEnemyHtml(resolved, '⚡ تیم حریف (CWL)');
     return editRich(ctx, html, keyboardEnemy('cwl'));
   } catch (err) {
@@ -93,13 +108,13 @@ async function cwlEnemyAction(ctx) {
 
 async function cwlHomeAction(ctx) {
   try {
+    await ctx.answerCbQuery('⏳ در حال بارگذاری...');
     const resolved = await resolveCwlWar();
     if (!resolved || !resolved.war) {
       return ctx.answerCbQuery('در حال حاضر کلن در CWL نیست.', {
         show_alert: true,
       });
     }
-    await ctx.answerCbQuery();
     const html = await buildOurHtml(resolved, '🏟 وضعیت لیگ کلن‌ها');
     return editRich(ctx, html, keyboardOur('cwl'));
   } catch (err) {

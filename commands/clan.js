@@ -3,6 +3,11 @@ const { escapeHtml, formatTag, stripEmojis } = require('../utils/helpers');
 const config = require('../config');
 const { checkCommandLimit } = require('../utils/commandRateLimit');
 const { withTelegramRetry } = require('../utils/telegramSafe');
+const {
+  sendLoading,
+  deleteLoading,
+  replaceLoadingText,
+} = require('../utils/loading');
 
 function typeLabel(type) {
   switch (type) {
@@ -45,9 +50,11 @@ function row(label, value) {
 }
 
 module.exports = async function clanCommand(ctx) {
+  let loadingMsg = null;
   try {
     const userId = ctx.from?.id;
-    const isOwner = userId != null && Number(userId) === Number(config.ownerTelegramId);
+    const isOwner =
+      userId != null && Number(userId) === Number(config.ownerTelegramId);
     const limit = checkCommandLimit(userId, 'clan', {
       limit: config.clanCmdLimit,
       windowMs: config.clanCmdWindowMs,
@@ -59,6 +66,8 @@ module.exports = async function clanCommand(ctx) {
         { parse_mode: 'HTML' }
       );
     }
+
+    loadingMsg = await sendLoading(ctx, '⏳ در حال دریافت اطلاعات کلن...');
 
     const clan = await getClan();
 
@@ -145,6 +154,9 @@ module.exports = async function clanCommand(ctx) {
       </table>
     `.trim();
 
+    await deleteLoading(ctx, loadingMsg);
+    loadingMsg = null;
+
     try {
       return await withTelegramRetry(
         () =>
@@ -176,6 +188,10 @@ ${description ? `📝 ${escapeHtml(description)}\n` : ''}👥 اعضا: <b>${mem
     }
   } catch (err) {
     console.error('[/clan]', err.message);
-    return ctx.reply(`❌ خطا در دریافت اطلاعات کلن: ${err.message}`);
+    return replaceLoadingText(
+      ctx,
+      loadingMsg,
+      `❌ خطا در دریافت اطلاعات کلن: ${err.message}`
+    );
   }
 };

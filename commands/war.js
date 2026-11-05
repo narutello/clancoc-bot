@@ -5,6 +5,11 @@ const { checkCommandLimit } = require('../utils/commandRateLimit');
 const { singleflight } = require('../utils/singleflight');
 const { getCache, setCache } = require('../utils/ttlCache');
 const {
+  sendLoading,
+  deleteLoading,
+  replaceLoadingText,
+} = require('../utils/loading');
+const {
   keyboardOur,
   keyboardEnemy,
   buildOurHtml,
@@ -41,6 +46,7 @@ async function resolveRegularWar() {
 }
 
 async function warCommand(ctx) {
+  let loadingMsg = null;
   try {
     const userId = ctx.from?.id;
     const isOwner =
@@ -58,23 +64,34 @@ async function warCommand(ctx) {
       );
     }
 
+    loadingMsg = await sendLoading(ctx, '⏳ در حال دریافت وضعیت وار...');
+
     const resolved = await resolveRegularWar();
     if (resolved && resolved.war) {
       const html = await buildOurHtml(resolved, '⚔️ وضعیت وار');
+      await deleteLoading(ctx, loadingMsg);
+      loadingMsg = null;
       return sendRich(ctx, html, keyboardOur('war'));
     }
 
     if (await isInCwl()) {
-      return ctx.reply(
+      return replaceLoadingText(
+        ctx,
+        loadingMsg,
         '🏟 کلن الان در <b>لیگ کلن‌ها (CWL)</b> است.\n' +
           'برای وضعیت لیگ از دستور /cwl استفاده کنید.',
         { parse_mode: 'HTML' }
       );
     }
 
-    return ctx.reply('در حال حاضر کلن در وار نیست.');
+    return replaceLoadingText(
+      ctx,
+      loadingMsg,
+      'در حال حاضر کلن در وار نیست.'
+    );
   } catch (err) {
     console.error('[/war]', err.message);
+    await deleteLoading(ctx, loadingMsg);
     return richMessageErrorReply(
       ctx,
       err,
@@ -85,13 +102,13 @@ async function warCommand(ctx) {
 
 async function warEnemyAction(ctx) {
   try {
+    await ctx.answerCbQuery('⏳ در حال بارگذاری...');
     const resolved = await resolveRegularWar();
     if (!resolved || !resolved.war) {
       return ctx.answerCbQuery('در حال حاضر کلن در وار معمولی نیست.', {
         show_alert: true,
       });
     }
-    await ctx.answerCbQuery();
     const html = await buildEnemyHtml(resolved, '⚡ تیم حریف');
     return editRich(ctx, html, keyboardEnemy('war'));
   } catch (err) {
@@ -104,13 +121,13 @@ async function warEnemyAction(ctx) {
 
 async function warHomeAction(ctx) {
   try {
+    await ctx.answerCbQuery('⏳ در حال بارگذاری...');
     const resolved = await resolveRegularWar();
     if (!resolved || !resolved.war) {
       return ctx.answerCbQuery('در حال حاضر کلن در وار معمولی نیست.', {
         show_alert: true,
       });
     }
-    await ctx.answerCbQuery();
     const html = await buildOurHtml(resolved, '⚔️ وضعیت وار');
     return editRich(ctx, html, keyboardOur('war'));
   } catch (err) {
