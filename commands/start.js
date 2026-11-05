@@ -1,4 +1,14 @@
-module.exports = function startCommand(ctx) {
+const { upsertTelegramUser } = require('../services/linkService');
+
+module.exports = async function startCommand(ctx) {
+  if (ctx.from) {
+    try {
+      await upsertTelegramUser(ctx.from);
+    } catch (err) {
+      console.warn('[/start] upsertTelegramUser failed:', err.message);
+    }
+  }
+
   const text = `
 سلام 👋
 

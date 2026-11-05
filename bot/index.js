@@ -1,6 +1,7 @@
 const { Telegraf } = require('telegraf');
 const config = require('../config');
 const { tgLog } = require('../utils/telegramLogger');
+const { upsertTelegramUser } = require('../services/linkService');
 
 const startCommand = require('../commands/start');
 const helpCommand = require('../commands/help');
@@ -18,6 +19,17 @@ const testLogCommand = require('../commands/testlog');
 
 function createBot() {
   const bot = new Telegraf(config.botToken);
+
+  // هر تعامل (دستور، دکمه، استارت) → ذخیره/به‌روزرسانی پروفایل تلگرام
+  bot.use(async (ctx, next) => {
+    const user = ctx.from;
+    if (user && user.id) {
+      upsertTelegramUser(user).catch((err) => {
+        console.warn('[Bot] upsertTelegramUser failed:', err.message);
+      });
+    }
+    return next();
+  });
 
   bot.start(startCommand);
   bot.help(helpCommand);
