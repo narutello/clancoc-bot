@@ -105,6 +105,46 @@ function countAttacks(members) {
   return used;
 }
 
+/** Members who still have unused attacks */
+function getPendingAttackers(members, attacksPerMember) {
+  const max = Math.max(1, Number(attacksPerMember) || 1);
+  return (members || [])
+    .filter((m) => (m.attacks || []).length < max)
+    .slice()
+    .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0));
+}
+
+/** HTML list of players with remaining attacks (Telegram links when available) */
+async function buildPendingAttackersHtml(members, attacksPerMember) {
+  const pending = getPendingAttackers(members, attacksPerMember);
+  if (pending.length === 0) {
+    return '<p>✅ همه اعضا حمله‌های خود را انجام داده‌اند.</p>';
+  }
+
+  const tags = pending.map((m) => m.tag);
+  const linksMap = await getLinksForTags(tags);
+  const max = Math.max(1, Number(attacksPerMember) || 1);
+
+  const lines = pending.map((m, index) => {
+    const used = (m.attacks || []).length;
+    const links = linksMap.get(m.tag) || [];
+    let nameCell;
+    if (links.length > 0) {
+      nameCell = links
+        .map((u) => tgUserLink(u.telegram_id, m.name))
+        .join(' / ');
+    } else {
+      nameCell = escapeHtml(m.name || formatTag(m.tag));
+    }
+    return `<p>${index + 1}. ${nameCell} — <b>${used}/${max}</b></p>`;
+  });
+
+  return (
+    `<p>⚠️ هنوز حمله نکرده‌اند / حمله کامل نیست (<b>${pending.length}</b> نفر):</p>` +
+    lines.join('')
+  );
+}
+
 async function buildMembersTableRows(members, attacksPerMember = 2) {
   if (!members || members.length === 0) return '';
   const tags = members.map((m) => m.tag);
@@ -245,28 +285,49 @@ async function notifyOneHourLeft(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_one_hour_left' : 'one_hour_left';
   if (await hasNotification(warKey, event)) return;
+
   const end = parseClashTime(war.endTime);
   if (!end) return;
+
   const msLeft = end.getTime() - Date.now();
+  // 50–70 minutes left → send once
   if (msLeft < 50 * 60 * 1000 || msLeft > 70 * 60 * 1000) return;
+
   const our = war.clan || {};
   const their = war.opponent || {};
   const ourName = stripEmojis(our.name || '—') || '—';
   const oppName = stripEmojis(their.name || '—') || '—';
+  const members = extractMembers(war);
+  const atkPer = getAttacksPerMember(war, isCwl);
+  const attacksUsed = countAttacks(members);
+  const maxAttacks = (war.teamSize || members.length) * atkPer;
+  const pendingHtml = await buildPendingAttackersHtml(members, atkPer);
+  const pendingCount = getPendingAttackers(members, atkPer).length;
+
   const dayLine =
     war.__cwlMeta && war.__cwlMeta.cwlDay
-      ? `📅 ${formatCwlDayLabel(war.__cwlMeta.cwlDay, war.__cwlMeta.cwlTotalDays)} لیگ کلن‌ها\n`
+      ? `<p>📅 ${formatCwlDayLabel(war.__cwlMeta.cwlDay, war.__cwlMeta.cwlTotalDays)} لیگ کلن‌ها</p>`
       : '';
+
   const html = `<h2>⏰ ۱ ساعت تا پایان وار${isCwl ? ' (CWL)' : ''}</h2>
-${dayLine ? `<p>${dayLine.trim()}</p>` : ''}
+${dayLine}
 <table bordered striped compact>
 <tr><th>کلن</th><th>ستاره</th><th>تخریب</th></tr>
 <tr><td>🏰 ${escapeHtml(ourName)}</td><td>${our.stars ?? 0} ⭐</td><td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td></tr>
 <tr><td>⚡ ${escapeHtml(oppName)}</td><td>${their.stars ?? 0} ⭐</td><td>${(their.destructionPercentage ?? 0).toFixed(1)}%</td></tr>
 </table>
+<p>⚔️ حمله‌ها: <b>${attacksUsed}/${maxAttacks}</b></p>
+${pendingHtml}
 <p>حمله‌هاتون رو فراموش نکنید.</p>`.trim();
+
   await sendToGroup(bot, html);
-  await tgLog.info('Notification sent: 1 hour left' + (isCwl ? ' (CWL)' : ''), null, { module: 'WarMonitor' });
+  await tgLog.info(
+    'Notification sent: 1 hour left' +
+      (isCwl ? ' (CWL)' : '') +
+      ` — pending attackers: ${pendingCount}`,
+    null,
+    { module: 'WarMonitor' }
+  );
   await markNotification(warKey, event);
 }
 
