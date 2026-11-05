@@ -1,14 +1,12 @@
 const config = require('../config');
 const { query } = require('../database');
 const { getCurrentWar, getClan } = require('../api/clash');
-const { findOurCwlWar, formatCwlDayLabel, buildCwlLeagueKey } = require('../services/cwlService');
+const { findOurCwlWar, buildCwlLeagueKey } = require('../services/cwlService');
 const { getLinksForTags } = require('../services/linkService');
 const {
   escapeHtml,
   stripEmojis,
-  warStateLabel,
   parseClashTime,
-  formatWarTime,
   getAttacksPerMember,
   normalizeTag,
 } = require('../utils/helpers');
@@ -23,9 +21,9 @@ function formatUptime(sec) {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const r = s % 60;
-  if (h > 0) return `${h}س ${m}د`;
-  if (m > 0) return `${m}د ${r}ث`;
-  return `${r}ث`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${r}s`;
+  return `${r}s`;
 }
 
 function formatAgo(date) {
@@ -33,11 +31,45 @@ function formatAgo(date) {
   const ms = Date.now() - new Date(date).getTime();
   if (Number.isNaN(ms) || ms < 0) return '—';
   const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}ث پیش`;
+  if (sec < 60) return `${sec}s ago`;
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}د پیش`;
+  if (min < 60) return `${min}m ago`;
   const h = Math.floor(min / 60);
-  return `${h}س پیش`;
+  return `${h}h ago`;
+}
+
+function warStateEn(state) {
+  const map = {
+    notInWar: 'Not in war',
+    preparation: 'Preparation',
+    inWar: 'In war',
+    warEnded: 'War ended',
+    ended: 'Ended',
+  };
+  return map[state] || String(state || 'unknown');
+}
+
+function cwlDayEn(day, total) {
+  if (!day) return 'CWL';
+  if (total) return `Day ${day}/${total}`;
+  return `Day ${day}`;
+}
+
+function formatTimeEn(date) {
+  if (!date || !(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tehran',
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
+  } catch {
+    return date.toISOString();
+  }
 }
 
 function buildWarKey(war) {
@@ -65,13 +97,13 @@ async function countRows(sql) {
 
 module.exports = async function statusCommand(ctx) {
   if (!isOwner(ctx)) {
-    return ctx.reply('⛔️ این دستور فقط برای Owner در دسترس است.');
+    return ctx.reply('⛔️ This command is owner-only.');
   }
 
   const lines = [];
-  lines.push('🟢 <b>ربات آنلاین</b>');
-  lines.push(`⏱ Uptime: حدود ${escapeHtml(formatUptime(process.uptime()))}`);
-  lines.push(`📡 Polling: هر ${Math.round(config.warPollIntervalMs / 1000)} ثانیه`);
+  lines.push('🟢 <b>Bot online</b>');
+  lines.push(`⏱ Uptime: ~${escapeHtml(formatUptime(process.uptime()))}`);
+  lines.push(`📡 Polling: every ${Math.round(config.warPollIntervalMs / 1000)}s`);
 
   let dbOk = false;
   let lastCheck = null;
@@ -85,7 +117,7 @@ module.exports = async function statusCommand(ctx) {
   }
   if (dbOk) {
     lines.push('🗄 Database: OK');
-    lines.push(`🔄 آخرین به‌روزرسانی state: ${escapeHtml(formatAgo(lastCheck))}`);
+    lines.push(`🔄 Last state update: ${escapeHtml(formatAgo(lastCheck))}`);
   }
 
   let apiOk = false;
@@ -103,7 +135,7 @@ module.exports = async function statusCommand(ctx) {
   );
 
   lines.push('');
-  lines.push('── <b>وار</b> ──');
+  lines.push('── <b>War</b> ──');
 
   let activeWar = null;
   let isCwl = false;
@@ -131,13 +163,13 @@ module.exports = async function statusCommand(ctx) {
       }
     } catch (err) {
       if (!err.isNotFound) {
-        lines.push(`⚠️ خطا در دریافت وار: ${escapeHtml(err.message)}`);
+        lines.push(`⚠️ War fetch error: ${escapeHtml(err.message)}`);
       }
     }
   }
 
   if (!activeWar) {
-    lines.push('در حال حاضر کلن در وار نیست.');
+    lines.push('Clan is not in war right now.');
   } else {
     const our = activeWar.clan || {};
     const opp = activeWar.opponent || {};
@@ -155,14 +187,14 @@ module.exports = async function statusCommand(ctx) {
 
     if (isCwl && cwlMeta) {
       lines.push(
-        `⚔️ نوع: <b>CWL</b> · ${escapeHtml(
-          formatCwlDayLabel(cwlMeta.cwlDay, cwlMeta.cwlTotalDays)
+        `⚔️ Type: <b>CWL</b> · ${escapeHtml(
+          cwlDayEn(cwlMeta.cwlDay, cwlMeta.cwlTotalDays)
         )}`
       );
     } else {
-      lines.push('⚔️ نوع: <b>وار معمولی</b>');
+      lines.push('⚔️ Type: <b>Regular war</b>');
     }
-    lines.push(`⏳ وضعیت: <b>${escapeHtml(warStateLabel(activeWar.state))}</b>`);
+    lines.push(`⏳ State: <b>${escapeHtml(warStateEn(activeWar.state))}</b>`);
     lines.push(
       `🏰 ${escapeHtml(ourName)} · ${our.stars ?? 0}⭐ · ${(our.destructionPercentage ?? 0).toFixed(1)}%`
     );
@@ -174,16 +206,16 @@ module.exports = async function statusCommand(ctx) {
       const start =
         parseClashTime(activeWar.startTime) ||
         parseClashTime(activeWar.preparationStartTime);
-      const formatted = formatWarTime(start);
-      if (formatted) lines.push(`🕐 شروع نبرد: ${escapeHtml(formatted)}`);
+      const formatted = formatTimeEn(start);
+      if (formatted) lines.push(`🕐 Battle starts: ${escapeHtml(formatted)} (Tehran)`);
     } else if (activeWar.state === 'inWar') {
       const end = parseClashTime(activeWar.endTime);
-      const formatted = formatWarTime(end);
-      if (formatted) lines.push(`🕐 پایان وار: ${escapeHtml(formatted)}`);
+      const formatted = formatTimeEn(end);
+      if (formatted) lines.push(`🕐 War ends: ${escapeHtml(formatted)} (Tehran)`);
     }
 
-    lines.push(`⚔️ حمله‌ها: <b>${used}/${maxAtk}</b>`);
-    lines.push(`⚠️ بدون حمله کامل: <b>${pending}</b> نفر`);
+    lines.push(`⚔️ Attacks: <b>${used}/${maxAtk}</b>`);
+    lines.push(`⚠️ Incomplete attacks: <b>${pending}</b> player(s)`);
 
     try {
       const tags = members.map((m) => m.tag).filter(Boolean);
@@ -192,11 +224,11 @@ module.exports = async function statusCommand(ctx) {
       for (const t of tags) {
         if ((map.get(t) || []).length > 0) linked += 1;
       }
-      lines.push(`📋 اعضای وار لینک‌شده: <b>${linked}/${tags.length}</b>`);
+      lines.push(`📋 Linked war members: <b>${linked}/${tags.length}</b>`);
     } catch (_) {}
 
     lines.push('');
-    lines.push('── <b>اعلان‌های این وار</b> ──');
+    lines.push('── <b>Notifications (this war)</b> ──');
     const warKey = buildWarKey(activeWar);
     if (isCwl) {
       const leagueKey = buildCwlLeagueKey(cwlMeta?.cwlSeason);
@@ -204,49 +236,49 @@ module.exports = async function statusCommand(ctx) {
       const start = await notificationMark(warKey, 'cwl_battle_start');
       const hour = await notificationMark(warKey, 'cwl_one_hour_left');
       const ended = await notificationMark(warKey, 'cwl_war_ended');
-      lines.push(`${prep} آماده‌سازی لیگ (روز۱)`);
-      lines.push(`${start} شروع نبرد این روز`);
-      lines.push(`${hour} ۱ ساعت مانده`);
-      lines.push(`${ended} پایان وار`);
+      lines.push(`${prep} League preparation (day 1)`);
+      lines.push(`${start} Battle start (this day)`);
+      lines.push(`${hour} 1 hour left`);
+      lines.push(`${ended} War ended`);
     } else {
       const prep = await notificationMark(warKey, 'preparation');
       const start = await notificationMark(warKey, 'battle_start');
       const hour = await notificationMark(warKey, 'one_hour_left');
       const ended = await notificationMark(warKey, 'war_ended');
-      lines.push(`${prep} آماده‌سازی / پیدا شدن حریف`);
-      lines.push(`${start} شروع نبرد`);
-      lines.push(`${hour} ۱ ساعت مانده`);
-      lines.push(`${ended} پایان وار`);
+      lines.push(`${prep} Preparation / opponent found`);
+      lines.push(`${start} Battle start`);
+      lines.push(`${hour} 1 hour left`);
+      lines.push(`${ended} War ended`);
     }
   }
 
   lines.push('');
-  lines.push('── <b>لینک‌ها</b> ──');
+  lines.push('── <b>Links</b> ──');
   try {
     const users = await countRows('SELECT COUNT(*)::int AS c FROM telegram_users');
     const links = await countRows('SELECT COUNT(*)::int AS c FROM user_accounts');
     const accounts = await countRows('SELECT COUNT(*)::int AS c FROM clash_accounts');
-    lines.push(`👤 کاربران تلگرام: <b>${users}</b>`);
-    lines.push(`🎮 اکانت کلش ثبت‌شده: <b>${accounts}</b>`);
-    lines.push(`🔗 لینک کاربر↔اکانت: <b>${links}</b>`);
+    lines.push(`👤 Telegram users: <b>${users}</b>`);
+    lines.push(`🎮 Clash accounts: <b>${accounts}</b>`);
+    lines.push(`🔗 User↔account links: <b>${links}</b>`);
   } catch (err) {
-    lines.push(`⚠️ شمارش لینک‌ها ناموفق: ${escapeHtml(err.message)}`);
+    lines.push(`⚠️ Link counts failed: ${escapeHtml(err.message)}`);
   }
 
   lines.push('');
-  lines.push('── <b>فنی (Owner)</b> ──');
+  lines.push('── <b>Technical (Owner)</b> ──');
   lines.push(
-    `📣 TELEGRAM_GROUP_ID: ${config.telegramGroupId ? 'ست شده' : '❌ ست نشده'}`
+    `📣 TELEGRAM_GROUP_ID: ${config.telegramGroupId ? 'set' : '❌ not set'}`
   );
   lines.push(
-    `📝 LOG_TELEGRAM_ID: ${config.logTelegramId ? 'ست شده' : '❌ ست نشده'}`
+    `📝 LOG_TELEGRAM_ID: ${config.logTelegramId ? 'set' : '❌ not set'}`
   );
   lines.push(`🏷 CLAN_TAG: <code>#${escapeHtml(config.clanTag)}</code>`);
   lines.push(
-    `🧠 Rate /war: ${config.warCmdLimit} در ${Math.round(config.warCmdWindowMs / 1000)}ث`
+    `🧠 Rate /war: ${config.warCmdLimit} per ${Math.round(config.warCmdWindowMs / 1000)}s`
   );
   lines.push(
-    `🧠 Rate /cwl: ${config.cwlCmdLimit} در ${Math.round(config.cwlCmdWindowMs / 1000)}ث`
+    `🧠 Rate /cwl: ${config.cwlCmdLimit} per ${Math.round(config.cwlCmdWindowMs / 1000)}s`
   );
   lines.push(`💾 War cache TTL: ${config.warCacheTtlMs}ms`);
 
