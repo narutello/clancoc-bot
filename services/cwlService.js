@@ -5,8 +5,26 @@ const {
 const { normalizeTag } = require('../utils/helpers');
 const config = require('../config');
 
+async function fetchCwlWarSafe(warTag) {
+  let lastErr;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await getCwlWar(warTag);
+    } catch (err) {
+      lastErr = err;
+      if (err && (err.isNotFound || err.status === 404)) throw err;
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 300 * attempt));
+        continue;
+      }
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * پیدا کردن وار فعال/آخرین وار CWL کلن + شماره روز
+ * اولویت: preparation/inWar (روز جاری) ؛ فقط اگر هیچ وار فعالی نباشد → آخرین warEnded
  */
 async function findOurCwlWar() {
   let group;
@@ -37,11 +55,12 @@ async function findOurCwlWar() {
       if (!warTag || warTag === '#0') continue;
 
       try {
-        const war = await getCwlWar(warTag);
+        const war = await fetchCwlWarSafe(warTag);
         const clanTag = normalizeTag(war.clan?.tag);
         const oppTag = normalizeTag(war.opponent?.tag);
         if (clanTag !== ourTag && oppTag !== ourTag) continue;
 
+        // Normalize so our clan is always war.clan
         if (oppTag === ourTag) {
           const tmp = war.clan;
           war.clan = war.opponent;
@@ -59,12 +78,16 @@ async function findOurCwlWar() {
           groupState: group.state || null,
         };
 
+        // Active war wins immediately — never fall back to an older ended day
         if (war.state === 'preparation' || war.state === 'inWar') {
           return result;
         }
 
+        // Keep the highest-day ended war as fallback only
         if (war.state === 'warEnded') {
-          endedFallback = result;
+          if (!endedFallback || day >= endedFallback.cwlDay) {
+            endedFallback = result;
+          }
         }
       } catch (_) {
         continue;
