@@ -12,7 +12,11 @@ const myAccountsCommand = require('../commands/myaccounts');
 const warCommand = require('../commands/war');
 const { warEnemyAction, warHomeAction } = warCommand;
 const cwlCommand = require('../commands/cwl');
-const { cwlEnemyAction, cwlHomeAction } = cwlCommand;
+const {
+  cwlEnemyAction,
+  cwlHomeAction,
+  cwlStandingsAction,
+} = cwlCommand;
 const clanCommand = require('../commands/clan');
 const statusCommand = require('../commands/status');
 const testNotifyCommand = require('../commands/testnotify');
@@ -45,6 +49,7 @@ function createBot() {
   bot.command('cwl', cwlCommand);
   bot.action('cwl:enemy', cwlEnemyAction);
   bot.action('cwl:home', cwlHomeAction);
+  bot.action('cwl:standings', cwlStandingsAction);
   bot.command('clan', clanCommand);
   bot.command('status', statusCommand);
   bot.command('testnotify', testNotifyCommand);
