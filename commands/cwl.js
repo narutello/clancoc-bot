@@ -1,4 +1,4 @@
-const { findOurCwlWar } = require('../services/cwlService');
+const { findOurCwlWar, getCwlStandings } = require('../services/cwlService');
 const config = require('../config');
 const { checkCommandLimit } = require('../utils/commandRateLimit');
 const { singleflight } = require('../utils/singleflight');
@@ -11,8 +11,10 @@ const {
 const {
   keyboardOur,
   keyboardEnemy,
+  keyboardStandings,
   buildOurHtml,
   buildEnemyHtml,
+  buildStandingsHtml,
   sendRich,
   editRich,
   richMessageErrorReply,
@@ -125,7 +127,41 @@ async function cwlHomeAction(ctx) {
   }
 }
 
+async function cwlStandingsAction(ctx) {
+  try {
+    const userId = ctx.from?.id;
+    const isOwner =
+      userId != null && Number(userId) === Number(config.ownerTelegramId);
+    const limit = checkCommandLimit(userId, 'cwl_standings', {
+      limit: config.cwlCmdLimit,
+      windowMs: config.cwlCmdWindowMs,
+      isOwner,
+    });
+    if (!limit.allowed) {
+      return ctx.answerCbQuery(
+        `درخواست زیاد است. حدود ${limit.retryAfterSec} ثانیه صبر کنید.`,
+        { show_alert: true }
+      );
+    }
+
+    await ctx.answerCbQuery('⏳ در حال ساخت جدول لیگ...');
+    const data = await getCwlStandings();
+    if (!data || !data.standings || !data.standings.length) {
+      return ctx.answerCbQuery('جدول لیگ در دسترس نیست.', { show_alert: true });
+    }
+
+    const html = buildStandingsHtml(data);
+    return editRich(ctx, html, keyboardStandings());
+  } catch (err) {
+    console.error('[cwl:standings]', err.message);
+    try {
+      await ctx.answerCbQuery('خطا در دریافت جدول لیگ', { show_alert: true });
+    } catch (_) {}
+  }
+}
+
 module.exports = cwlCommand;
 module.exports.cwlEnemyAction = cwlEnemyAction;
 module.exports.cwlHomeAction = cwlHomeAction;
+module.exports.cwlStandingsAction = cwlStandingsAction;
 module.exports.resolveCwlWar = resolveCwlWar;
