@@ -235,13 +235,12 @@ function buildStandingsHtml(data) {
   const rows = data.standings
     .map((row) => {
       const name = escapeHtml(row.name || row.tag);
-      const mark = row.isOurs ? ' fort' : '';
       const label = row.isOurs ? `<b>🏰 ${name}</b>` : name;
       const starsLabel =
         row.bonusStars > 0
           ? `${row.stars} ⭐ <i>(${row.attackStars}+${row.bonusStars})</i>`
           : `${row.stars} ⭐`;
-      return `<tr${mark}>
+      return `<tr>
         <td>${row.rank}</td>
         <td>${label}</td>
         <td>${starsLabel}</td>
