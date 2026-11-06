@@ -37,6 +37,10 @@ const config = {
 
   warCacheTtlMs: intEnv('WAR_CACHE_TTL_MS', 8000),
 
+  // CWL group table: cache hard to protect API (default 10 minutes)
+  cwlStandingsCacheTtlMs: intEnv('CWL_STANDINGS_CACHE_TTL_MS', 600000),
+  cwlStandingsConcurrency: intEnv('CWL_STANDINGS_CONCURRENCY', 3),
+
   clashMaxRetries: intEnv('CLASH_MAX_RETRIES', 3),
   clashApiTimeoutMs: intEnv('CLASH_API_TIMEOUT_MS', 15000),
   telegramMaxRetries: intEnv('TELEGRAM_MAX_RETRIES', 3),
