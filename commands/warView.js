@@ -14,14 +14,24 @@ const config = require('../config');
 const { withTelegramRetry } = require('../utils/telegramSafe');
 
 function keyboardOur(prefix) {
+  const row = [{ text: '👁 Enemy', callback_data: `${prefix}:enemy` }];
+  if (prefix === 'cwl') {
+    row.push({ text: '🏆 جدول', callback_data: 'cwl:standings' });
+  }
   return {
-    inline_keyboard: [[{ text: '👁 Enemy', callback_data: `${prefix}:enemy` }]],
+    inline_keyboard: [row],
   };
 }
 
 function keyboardEnemy(prefix) {
   return {
     inline_keyboard: [[{ text: '↩️ Back', callback_data: `${prefix}:home` }]],
+  };
+}
+
+function keyboardStandings() {
+  return {
+    inline_keyboard: [[{ text: '↩️ Back', callback_data: 'cwl:home' }]],
   };
 }
 
@@ -217,6 +227,50 @@ async function buildEnemyHtml(resolved, title = '⚡ تیم حریف') {
   `.trim();
 }
 
+function buildStandingsHtml(data) {
+  if (!data || !data.standings || !data.standings.length) {
+    return '<h2>🏆 جدول لیگ</h2><p>اطلاعات جدول در دسترس نیست.</p>';
+  }
+
+  const rows = data.standings
+    .map((row) => {
+      const name = escapeHtml(row.name || row.tag);
+      const mark = row.isOurs ? ' fort' : '';
+      const label = row.isOurs ? `<b>🏰 ${name}</b>` : name;
+      const starsLabel =
+        row.bonusStars > 0
+          ? `${row.stars} ⭐ <i>(${row.attackStars}+${row.bonusStars})</i>`
+          : `${row.stars} ⭐`;
+      return `<tr${mark}>
+        <td>${row.rank}</td>
+        <td>${label}</td>
+        <td>${starsLabel}</td>
+        <td>${(row.destruction || 0).toFixed(1)}%</td>
+      </tr>`;
+    })
+    .join('');
+
+  const seasonLine = data.season
+    ? `<p>📅 فصل: <b>${escapeHtml(String(data.season))}</b></p>`
+    : '';
+
+  return `
+    <h2>🏆 جدول لیگ کلن‌ها</h2>
+    ${seasonLine}
+    <p>رتبه‌بندی بر اساس ستاره (شامل +۱۰ برد)، سپس تخریب.</p>
+    <table bordered striped compact>
+      <tr>
+        <th>#</th>
+        <th>کلن</th>
+        <th>ستاره</th>
+        <th>تخریب</th>
+      </tr>
+      ${rows}
+    </table>
+    <p><i>کش تا حدود ۱۰ دقیقه — برای کم‌کردن فشار API.</i></p>
+  `.trim();
+}
+
 async function sendRich(ctx, html, replyMarkup) {
   return withTelegramRetry(
     () =>
@@ -272,8 +326,10 @@ function richMessageErrorReply(ctx, err, fallbackMsg) {
 module.exports = {
   keyboardOur,
   keyboardEnemy,
+  keyboardStandings,
   buildOurHtml,
   buildEnemyHtml,
+  buildStandingsHtml,
   sendRich,
   editRich,
   richMessageErrorReply,
