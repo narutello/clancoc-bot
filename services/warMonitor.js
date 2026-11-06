@@ -476,17 +476,43 @@ async function checkCwl(bot) {
   const war = found.war;
   const meta = { cwlDay: found.cwlDay, cwlTotalDays: found.cwlTotalDays, cwlSeason: found.cwlSeason };
   war.__cwlMeta = meta;
+
+  const last = await getLastState();
+  const warKey = buildWarKey(war);
+  const lastKey = buildWarKeyFromSaved(last);
+
   if (war.state === 'preparation') await notifyCwlLeagueStart(bot, war, meta);
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, true);
     await notifyOneHourLeft(bot, war, true);
   }
-  if (war.state === 'warEnded') await notifyWarEnded(bot, war, true);
+
+  // CWL war-end only on real transition for THIS war (prep/inWar → warEnded).
+  // Prevents delayed "day N ended" while day N+1 is already active, e.g. when
+  // a transient API miss falls back to an older warEnded round.
+  if (war.state === 'warEnded') {
+    const lastWasActive =
+      last &&
+      last.is_cwl &&
+      lastKey === warKey &&
+      (last.state === 'inWar' || last.state === 'preparation');
+    if (lastWasActive) {
+      await notifyWarEnded(bot, war, true);
+    } else {
+      console.log(
+        `[WarMonitor] Skip stale CWL warEnded notify (day ${meta.cwlDay}, last=${last?.state || 'none'})`
+      );
+    }
+  }
+
   await saveState({
     state: war.state,
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
     teamSize: war.teamSize,
+    preparationStart: war.preparationStartTime ? parseClashTime(war.preparationStartTime) : null,
+    startTime: war.startTime ? parseClashTime(war.startTime) : null,
+    endTime: war.endTime ? parseClashTime(war.endTime) : null,
     isCwl: true,
     ourStars: war.clan?.stars,
     theirStars: war.opponent?.stars,
