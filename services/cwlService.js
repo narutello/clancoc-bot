@@ -166,6 +166,7 @@ async function computeCwlStandings() {
 
   const ourTag = normalizeTag(config.clanTag);
   const byTag = new Map();
+  const ourRosterTags = new Set();
 
   for (const c of clans) {
     const tag = normalizeTag(c.tag);
@@ -181,6 +182,14 @@ async function computeCwlStandings() {
       wins: 0,
       isOurs: tag === ourTag,
     });
+
+    // CWL roster for our clan (best source for end-of-league thanks)
+    if (tag === ourTag) {
+      for (const m of c.members || []) {
+        const mt = normalizeTag(m.tag);
+        if (mt) ourRosterTags.add(mt);
+      }
+    }
   }
 
   const warTags = [];
@@ -205,9 +214,17 @@ async function computeCwlStandings() {
   });
 
   let warsCounted = 0;
+  let activeWars = 0;
+  let ourWarsEnded = 0;
+  let ourWarsTotal = 0;
+
   for (const war of wars) {
     if (!war || !war.state || war.state === 'notInWar') continue;
-    // preparation: usually 0–0; still ok to count once battle stars appear
+
+    if (war.state === 'preparation' || war.state === 'inWar') {
+      activeWars += 1;
+    }
+
     const left = war.clan || {};
     const right = war.opponent || {};
     const leftTag = normalizeTag(left.tag);
@@ -230,7 +247,20 @@ async function computeCwlStandings() {
     leftRow.wars += 1;
     rightRow.wars += 1;
 
-    // +10 bonus only after war ends (same as in-game group table once decided)
+    // Collect our side members from each war as fallback for mentions
+    let ourSide = null;
+    if (leftTag === ourTag) ourSide = left;
+    else if (rightTag === ourTag) ourSide = right;
+    if (ourSide) {
+      ourWarsTotal += 1;
+      if (war.state === 'warEnded') ourWarsEnded += 1;
+      for (const m of ourSide.members || []) {
+        const mt = normalizeTag(m.tag);
+        if (mt) ourRosterTags.add(mt);
+      }
+    }
+
+    // +10 bonus only after war ends
     if (war.state === 'warEnded') {
       const winner = decideWarWinner(left, right);
       if (winner === 'a') {
@@ -259,25 +289,37 @@ async function computeCwlStandings() {
     row.rank = i + 1;
   });
 
+  const ourRow = standings.find((r) => r.isOurs) || null;
+
   return {
     season: group.season != null ? String(group.season) : null,
     state: group.state || null,
     ourTag,
     warsFetched: warTags.length,
     warsCounted,
+    activeWars,
+    ourWarsTotal,
+    ourWarsEnded,
+    totalDays: rounds.length,
     standings,
+    ourRow,
+    ourRosterTags: Array.from(ourRosterTags),
     fetchedAt: Date.now(),
   };
 }
 
-async function getCwlStandings() {
+async function getCwlStandings({ forceFresh = false } = {}) {
   const cacheKey = `cwlStandings:${config.clanTag}`;
-  const cached = getCache(cacheKey);
-  if (cached !== null) return cached;
+  if (!forceFresh) {
+    const cached = getCache(cacheKey);
+    if (cached !== null) return cached;
+  }
 
-  return singleflight(cacheKey, async () => {
-    const again = getCache(cacheKey);
-    if (again !== null) return again;
+  return singleflight(cacheKey + (forceFresh ? ':fresh' : ''), async () => {
+    if (!forceFresh) {
+      const again = getCache(cacheKey);
+      if (again !== null) return again;
+    }
     const result = await computeCwlStandings();
     const ttl = config.cwlStandingsCacheTtlMs || 10 * 60 * 1000;
     setCache(cacheKey, result, ttl);
