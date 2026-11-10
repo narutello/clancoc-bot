@@ -24,10 +24,6 @@ async function fetchCwlWarSafe(warTag) {
   throw lastErr;
 }
 
-/**
- * پیدا کردن وار فعال/آخرین وار CWL کلن + شماره روز
- * اولویت: preparation/inWar (روز جاری) ؛ فقط اگر هیچ وار فعالی نباشد → آخرین warEnded
- */
 async function findOurCwlWar() {
   let group;
   try {
@@ -62,7 +58,6 @@ async function findOurCwlWar() {
         const oppTag = normalizeTag(war.opponent?.tag);
         if (clanTag !== ourTag && oppTag !== ourTag) continue;
 
-        // Normalize so our clan is always war.clan
         if (oppTag === ourTag) {
           const tmp = war.clan;
           war.clan = war.opponent;
@@ -80,12 +75,10 @@ async function findOurCwlWar() {
           groupState: group.state || null,
         };
 
-        // Active war wins immediately — never fall back to an older ended day
         if (war.state === 'preparation' || war.state === 'inWar') {
           return result;
         }
 
-        // Keep the highest-day ended war as fallback only
         if (war.state === 'warEnded') {
           if (!endedFallback || day >= endedFallback.cwlDay) {
             endedFallback = result;
@@ -147,10 +140,10 @@ async function mapPool(items, concurrency, worker) {
   return results;
 }
 
-/**
- * جمع‌زدن ستاره‌های گروه لیگ از روی همهٔ وارها.
- * بهینه‌سازی: کش حافظه + singleflight + concurrency محدود.
- */
+function memberAttackStars(member) {
+  return (member.attacks || []).reduce((sum, a) => sum + (a.stars || 0), 0);
+}
+
 async function computeCwlStandings() {
   let group;
   try {
@@ -166,7 +159,8 @@ async function computeCwlStandings() {
 
   const ourTag = normalizeTag(config.clanTag);
   const byTag = new Map();
-  const ourRosterTags = new Set();
+  /** @type {Map<string, { stars: number, name: string }>} */
+  const ourPlayerStats = new Map();
 
   for (const c of clans) {
     const tag = normalizeTag(c.tag);
@@ -182,14 +176,6 @@ async function computeCwlStandings() {
       wins: 0,
       isOurs: tag === ourTag,
     });
-
-    // CWL roster for our clan (best source for end-of-league thanks)
-    if (tag === ourTag) {
-      for (const m of c.members || []) {
-        const mt = normalizeTag(m.tag);
-        if (mt) ourRosterTags.add(mt);
-      }
-    }
   }
 
   const warTags = [];
@@ -247,20 +233,27 @@ async function computeCwlStandings() {
     leftRow.wars += 1;
     rightRow.wars += 1;
 
-    // Collect our side members from each war as fallback for mentions
     let ourSide = null;
     if (leftTag === ourTag) ourSide = left;
     else if (rightTag === ourTag) ourSide = right;
+
     if (ourSide) {
       ourWarsTotal += 1;
       if (war.state === 'warEnded') ourWarsEnded += 1;
+
+      // Only players who actually appeared in our war maps
       for (const m of ourSide.members || []) {
         const mt = normalizeTag(m.tag);
-        if (mt) ourRosterTags.add(mt);
+        if (!mt) continue;
+        const gained = memberAttackStars(m);
+        const prev = ourPlayerStats.get(mt) || { stars: 0, name: m.name || mt };
+        ourPlayerStats.set(mt, {
+          stars: prev.stars + gained,
+          name: m.name || prev.name || mt,
+        });
       }
     }
 
-    // +10 bonus only after war ends
     if (war.state === 'warEnded') {
       const winner = decideWarWinner(left, right);
       if (winner === 'a') {
@@ -291,6 +284,12 @@ async function computeCwlStandings() {
 
   const ourRow = standings.find((r) => r.isOurs) || null;
 
+  // Serializable map for league-end thanks (tag -> { stars, name })
+  const ourPlayerStars = {};
+  for (const [tag, info] of ourPlayerStats.entries()) {
+    ourPlayerStars[tag] = { stars: info.stars, name: info.name };
+  }
+
   return {
     season: group.season != null ? String(group.season) : null,
     state: group.state || null,
@@ -303,7 +302,7 @@ async function computeCwlStandings() {
     totalDays: rounds.length,
     standings,
     ourRow,
-    ourRosterTags: Array.from(ourRosterTags),
+    ourPlayerStars,
     fetchedAt: Date.now(),
   };
 }
