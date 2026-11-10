@@ -1,6 +1,6 @@
 # ClanCoC Bot
 
-ربات تلگرام حرفه‌ای برای مدیریت وارهای کلن **Clash of Clans**.
+ربات تلگرام برای مدیریت وارهای کلن **Clash of Clans**.
 
 پایش خودکار وار معمولی و CWL، اعلان گروهی با جدول Rich Message، لینک چندبه‌چند کاربران تلگرام و اکانت‌های کلش، و دیتابیس پایدار روی Neon PostgreSQL.
 
@@ -11,38 +11,36 @@
 ### اعلان‌های خودکار گروه
 | رویداد | توضیح |
 |--------|--------|
-| پیدا شدن حریف | جدول کلن‌ها + لیست اعضای وار |
-| شروع آماده‌سازی | وضعیت + زمان شروع نبرد |
+| پیدا شدن حریف / آماده‌سازی | جدول کلن‌ها + اعضای وار |
 | شروع روز نبرد | جدول کامل + تعداد حمله‌ها |
-| **۱ ساعت مانده به پایان** | یادآوری با امتیاز فعلی دو کلن |
-| پایان وار | جدول نهایی + نتیجه (برد / باخت / مساوی) |
+| **۱ ساعت مانده به پایان** | امتیاز فعلی + لیست/منشن کسانی که حمله باقی دارند |
+| پایان وار | جدول نهایی + نتیجه |
+| پایان لیگ (CWL) | رتبه نهایی گروه + تشکر از بازیکنان با حداقل ۱۵ ستاره |
 
 اعلان‌ها تکراری ارسال نمی‌شوند (حتی بعد از Restart).
 
-### دستور `/war`
-نمایش وضعیت وار با **Telegram Rich Message** (جدول واقعی):
+### دستور `/war` و `/cwl`
+نمایش وضعیت با **Telegram Rich Message**:
 
-- جدول کلن‌ها: نام (بدون ایموجی) · ستاره · درصد تخریب
-- اندازه وار (مثلاً 5v5) و وضعیت
-- زمان خوانا به وقت تهران (`امروز ساعت ۲۱:۰۰` / `فردا ساعت ۰۸:۳۰`)
-- جدول اعضای وار با ستون‌ها:
-  - `#` · بازیکن · حمله · ستاره · **دفاع**
-- ستون **دفاع** = بهترین ستاره‌ای که حریف روی بیس آن عضو گرفته
-- اعضای لینک‌شده → اسم قابل کلیک به پروفایل تلگرام
+- جدول کلن‌ها: نام · ستاره · درصد تخریب
+- وضعیت و زمان خوانا به وقت تهران
+- جدول اعضا: `#` · بازیکن · TH · حمله · ستاره · دفاع
+- دکمه جابه‌جایی خودمان / حریف (و در CWL: رتبه گروه)
+- اعضای لینک‌شده → اسم قابل کلیک
 
 ### سیستم لینک اکانت
-- هر کاربر تلگرام می‌تواند چند اکانت کلش لینک کند
-- یک اکانت کلش می‌تواند به چند کاربر تلگرام لینک شود
-- اونر می‌تواند برای دیگران لینک کند: `/link TELEGRAM_ID #TAG`
-- کاربران عادی فقط لینک‌های خود را مدیریت می‌کنند
-- لینک‌ها بعد از Restart در دیتابیس باقی می‌مانند
+- چند اکانت کلش برای یک کاربر تلگرام
+- یک اکانت کلش برای چند کاربر تلگرام
+- اونر: `/link TELEGRAM_ID #TAG`
+- پایداری لینک‌ها در دیتابیس بعد از Restart
 
 ### فنی
 - Node.js + Telegraf
-- Neon PostgreSQL (connection pool + migration خودکار)
-- Clash API **فقط** از طریق پروکسی RoyaleAPI
-- Health HTTP server برای سازگاری با Inject Cloud و هاست‌های مشابه
-- ساختار ماژولار، بدون TypeScript و بدون build پیچیده
+- Neon PostgreSQL (pool + migration + retry)
+- Clash API فقط از طریق پروکسی RoyaleAPI
+- Rate limit دستورات، کش کوتاه `/war`، singleflight
+- کانال لاگ اختیاری (`LOG_TELEGRAM_ID`)
+- Health HTTP برای هاست
 
 ---
 
@@ -52,13 +50,11 @@
 - توکن ربات از [@BotFather](https://t.me/BotFather)
 - دیتابیس [Neon PostgreSQL](https://neon.tech)
 - توکن API از [developer.clashofclans.com](https://developer.clashofclans.com)
-- هاست Node.js (مثلاً [Inject Cloud](https://injectcloud.space) یا Botkeep)
+- هاست Node.js (Inject Cloud / Botkeep / مشابه)
 
 ---
 
 ## متغیرهای محیطی
-
-فایل نمونه:
 
 ```bash
 cp .env.example .env
@@ -67,22 +63,19 @@ cp .env.example .env
 | متغیر | توضیح | الزامی |
 |-------|--------|--------|
 | `BOT_TOKEN` | توکن ربات تلگرام | بله |
-| `DATABASE_URL` | رشته اتصال Neon PostgreSQL | بله |
+| `DATABASE_URL` | رشته اتصال Neon | بله |
 | `CLASH_API_TOKEN` | توکن API کلش | بله |
-| `CLASH_API_BASE_URL` | پیش‌فرض: `https://cocproxy.royaleapi.dev/v1` | خیر |
-| `OWNER_TELEGRAM_ID` | شناسه عددی تلگرام صاحب ربات | بله |
-| `TELEGRAM_GROUP_ID` | شناسه گروه اعلان‌ها (برای سوپرگروه منفی است) | توصیه می‌شود |
-| `CLAN_TAG` | تگ کلن (با یا بدون `#`) | بله |
-| `WAR_POLL_INTERVAL_MS` | فاصله بررسی وار (میلی‌ثانیه)، پیش‌فرض `120000` | خیر |
+| `CLASH_API_BASE_URL` | پیش‌فرض RoyaleAPI proxy | خیر |
+| `OWNER_TELEGRAM_ID` | آیدی عددی اونر | بله |
+| `TELEGRAM_GROUP_ID` | گروه اعلان‌ها | توصیه |
+| `CLAN_TAG` | تگ کلن | بله |
+| `WAR_POLL_INTERVAL_MS` | فاصله پایش (پیش‌فرض ۱۲۰۰۰۰) | خیر |
+| `LOG_TELEGRAM_ID` | کانال/چت لاگ | خیر |
+| `WAR_CMD_LIMIT` / `WAR_CMD_WINDOW_MS` | ریت‌لیمیت `/war` | خیر |
+| `CWL_CMD_LIMIT` / `CWL_CMD_WINDOW_MS` | ریت‌لیمیت `/cwl` | خیر |
+| `CLAN_CMD_LIMIT` / `CLAN_CMD_WINDOW_MS` | ریت‌لیمیت `/clan` | خیر |
 
-### تنظیم توکن کلش برای پروکسی RoyaleAPI
-
-1. به [developer.clashofclans.com](https://developer.clashofclans.com) بروید.
-2. کلید جدید بسازید و این IP را وایت‌لیست کنید:
-   ```
-   45.79.218.79
-   ```
-3. توکن را در `CLASH_API_TOKEN` قرار دهید.
+کلید API کلش باید IP پروکسی RoyaleAPI را وایت‌لیست کند (در مستندات پروکسی).
 
 ---
 
@@ -93,28 +86,7 @@ npm install
 npm start
 ```
 
-با `npm start`:
-
-1. جداول دیتابیس ساخته/به‌روز می‌شوند
-2. ربات به تلگرام وصل می‌شود
-3. سرور health روی `PORT` (برای هاست) بالا می‌آید
-4. مانیتور وار طبق `WAR_POLL_INTERVAL_MS` وضعیت را چک می‌کند
-
-### دیپلوی روی Inject Cloud
-
-1. اکانت GitHub را در **Settings → Connections** وصل کنید.
-2. اپ جدید با منبع **GitHub** و ریپوی این پروژه بسازید (شاخه `main`).
-3. Environment Variables را در پنل تنظیم کنید.
-4. Deploy / Rebuild کنید.
-5. برای دیپلوی خودکار با هر Push، Webhook گیت‌هاب را از پنل همگام کنید.
-
-ربات یک HTTP health endpoint ساده روی پورت محیط دارد تا health-check هاست پاس شود.
-
-### دیپلوی روی Botkeep
-
-1. ریپو را وصل کنید.
-2. Start Command: `npm start`
-3. Environment Variables را اضافه کنید و Deploy کنید.
+با `npm start` مهاجرت دیتابیس، اتصال تلگرام، health server و مانیتور وار اجرا می‌شود.
 
 ---
 
@@ -122,56 +94,38 @@ npm start
 
 | دستور | توضیح | دسترسی |
 |-------|--------|--------|
-| `/start` | معرفی ربات | همه |
+| `/start` | معرفی | همه |
 | `/help` | راهنما | همه |
-| `/war` | وضعیت وار با جدول | همه |
+| `/war` | وضعیت وار معمولی | همه |
+| `/cwl` | وضعیت لیگ کلن‌ها | همه |
 | `/clan` | اطلاعات کلن | همه |
-| `/link #TAG` | لینک اکانت به خود | همه |
-| `/link TELEGRAM_ID #TAG` | لینک برای کاربر دیگر | فقط اونر |
-| `/myaccounts` | لیست اکانت‌های لینک‌شده | همه |
-| `/unlink #TAG` | حذف لینک خود | همه |
-| `/unlink TELEGRAM_ID #TAG` | حذف لینک کاربر دیگر | فقط اونر |
-| `/unlinkall` | حذف همه لینک‌های خود | همه |
+| `/testw` | پیش‌نمایش Widget (عمدتاً PV) | همه |
+| `/link #TAG` | لینک اکانت | همه |
+| `/link TELEGRAM_ID #TAG` | لینک برای دیگری | اونر |
+| `/myaccounts` | لیست اکانت‌ها | همه |
+| `/unlink` / `/unlinkall` | حذف لینک | همه |
+| `/status` | وضعیت فنی | اونر |
+| `/testnotify` | تست پیام گروه | اونر |
+| `/testlog` | تست کانال لاگ | اونر |
 
 ---
 
 ## ساختار پروژه
 
 ```
-index.js              # نقطه ورود + health server
-config/               # خواندن Environment Variables
-bot/                  # راه‌اندازی Telegraf
-commands/             # دستورات (/war, /link, ...)
+index.js                 # ورود + health
+config/                  # env
+bot/                     # Telegraf
+commands/                # دستورات
 services/
-  warMonitor.js       # پایش وار + اعلان گروهی
-  linkService.js      # منطق لینک Many-to-Many
-api/clash.js          # کلاینت RoyaleAPI proxy
-database/             # pool و migration
-utils/helpers.js      # escape، زمان تهران، حذف ایموجی، ...
+  warMonitor.js          # پایش + اعلان
+  cwlService.js          # CWL + standings
+  cwlLeagueEnd.js        # پیام پایان لیگ
+  linkService.js         # لینک Many-to-Many
+api/clash.js             # RoyaleAPI client
+database/                # pool + migrate
+utils/                   # helpers, rate limit, logger, ...
 ```
-
----
-
-## جزئیات اعلان‌ها
-
-- **فرمت:** Telegram Rich Message (`sendRichMessage`) با جدول HTML
-- **زمان‌ها:** بر اساس `Asia/Tehran` (`امروز` / `فردا` / نام روز هفته)
-- **۱ ساعت مانده:** فقط وقتی بین ۵۰ تا ۷۰ دقیقه به پایان مانده باشد، یک‌بار ارسال می‌شود
-- **ضدتکرار:** جدول `war_notifications` در دیتابیس
-
-اگر کلاینت کاربر از Rich Message پشتیبانی نکند، پیام مناسب برگردانده می‌شود.
-
----
-
-## عیب‌یابی رایج
-
-| مشکل | راه حل |
-|------|--------|
-| Deploy روی Inject Cloud با خطای پورت | نسخه فعلی health server دارد؛ Rebuild کنید |
-| زمان در `/war` نمایش داده نمی‌شود | از آخرین نسخه استفاده کنید (پارس فرمت Clash اصلاح شده) |
-| اعلان گروه نمی‌آید | `TELEGRAM_GROUP_ID` را چک کنید؛ ربات باید ادمین گروه باشد |
-| خطای Clash API 403 | IP پروکسی `45.79.218.79` را در کلید API وایت‌لیست کنید |
-| دیتابیس وصل نمی‌شود | `DATABASE_URL` و SSL (`sslmode=require`) را بررسی کنید |
 
 ---
 
