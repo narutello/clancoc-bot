@@ -14,14 +14,14 @@ module.exports = async function helpCommand(ctx) {
 /unlinkall — حذف همه لینک‌های شما
 /myaccounts — فهرست اکانت‌های لینک‌شده
 
+<b>آزمایشی</b>
+/testw — پیش‌نمایش Widget وضعیت وار\n(در production فعلاً مطمئن‌ترین حالت: چت خصوصی با ربات)
+
 <b>نکته CWL</b>
-در لیگ کلن‌ها از /cwl استفاده کنید.
-اگر /war بزنید و کلن در CWL باشد، ربات شما را به /cwl راهنمایی می‌کند.
+در لیگ کلن‌ها از /cwl استفاده کنید.\nاگر /war بزنید و کلن در CWL باشد، ربات شما را به /cwl راهنمایی می‌کند.
 
 <b>Owner</b>
-<code>/link TELEGRAM_USER_ID #TAG</code>
-<code>/testnotify</code>
-<code>/testlog</code>
+<code>/status</code> — وضعیت فنی ربات\n<code>/link TELEGRAM_USER_ID #TAG</code>\n<code>/testnotify</code> — تست ارسال به گروه\n<code>/testlog</code> — تست کانال لاگ
 `.trim();
 
   return ctx.reply(text, { parse_mode: 'HTML' });
