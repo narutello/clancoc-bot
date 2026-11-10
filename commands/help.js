@@ -1,8 +1,11 @@
-module.exports = async function helpCommand(ctx) {
-  const text = `
+const config = require('../config');
+const { withTelegramRetry } = require('../utils/telegramSafe');
+
+function publicHelpText() {
+  return `
 🤖 <b>راهنمای ربات مدیریت وار</b>
 
-<b>دستورات عمومی</b>
+<b>دستورات</b>
 /war — وضعیت وار معمولی
 /cwl — وضعیت لیگ کلن‌ها (CWL)
 /clan — اطلاعات کلن
@@ -14,15 +17,63 @@ module.exports = async function helpCommand(ctx) {
 /unlinkall — حذف همه لینک‌های شما
 /myaccounts — فهرست اکانت‌های لینک‌شده
 
-<b>آزمایشی</b>
-/testw — پیش‌نمایش Widget وضعیت وار\n(در production فعلاً مطمئن‌ترین حالت: چت خصوصی با ربات)
-
-<b>نکته CWL</b>
-در لیگ کلن‌ها از /cwl استفاده کنید.\nاگر /war بزنید و کلن در CWL باشد، ربات شما را به /cwl راهنمایی می‌کند.
-
-<b>Owner</b>
-<code>/status</code> — وضعیت فنی ربات\n<code>/link TELEGRAM_USER_ID #TAG</code>\n<code>/testnotify</code> — تست ارسال به گروه\n<code>/testlog</code> — تست کانال لاگ
+<b>نکته</b>
+در لیگ کلن‌ها از /cwl استفاده کنید.
+اگر /war بزنید و کلن در CWL باشد، ربات شما را راهنمایی می‌کند.
 `.trim();
+}
 
-  return ctx.reply(text, { parse_mode: 'HTML' });
+function ownerHelpText() {
+  return `
+🤖 <b>راهنمای ربات — Owner</b>
+
+<b>عمومی</b>
+/war · /cwl · /clan · /help
+/link #TAG · /unlink #TAG · /unlinkall · /myaccounts
+
+<b>مدیریت لینک دیگران</b>
+<code>/link TELEGRAM_USER_ID #TAG</code>
+<code>/unlink TELEGRAM_USER_ID #TAG</code>
+
+<b>ابزار اونر</b>
+/status — وضعیت فنی ربات
+/testnotify — تست ارسال به گروه
+/testlog — تست کانال لاگ
+/testw — پیش‌نمایش Widget (عمدتاً PV)
+
+<b>نکته</b>
+نوتیف‌های وار/CWL خودکار به گروه می‌روند.
+این راهنما فقط برای شما نمایش داده می‌شود.
+`.trim();
+}
+
+module.exports = async function helpCommand(ctx) {
+  const userId = ctx.from?.id;
+  const isOwner =
+    userId != null && Number(userId) === Number(config.ownerTelegramId);
+  const text = isOwner ? ownerHelpText() : publicHelpText();
+
+  const payload = {
+    chat_id: ctx.chat.id,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  };
+
+  // In groups: only the caller sees the help message (Bot API ephemeral)
+  if (ctx.chat?.type && ctx.chat.type !== 'private' && userId) {
+    payload.ephemeral_message_parameters = {
+      receiver_user_id: userId,
+    };
+  }
+
+  try {
+    await withTelegramRetry(() => ctx.telegram.callApi('sendMessage', payload), {
+      maxRetries: config.telegramMaxRetries,
+    });
+  } catch (err) {
+    // Older clients / API: fall back to a normal reply
+    console.warn('[/help] ephemeral send failed:', err.message);
+    return ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
+  }
 };
