@@ -18,37 +18,48 @@ function sortMembers(list) {
     .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0));
 }
 
-function memberStats(m, atkPer) {
+function memberLine(m, index, atkPer) {
   const attacks = m.attacks || [];
   const stars = attacks.reduce((s, a) => s + (a.stars || 0), 0);
-  const defStars = m.bestOpponentAttack?.stars ?? 0;
   const th = m.townhallLevel ?? m.townHallLevel ?? '—';
-  return {
-    name: escapeHtml(m.name || '—'),
-    attacks: attacks.length,
-    atkPer,
-    stars,
-    defStars,
-    th,
-  };
+  const name = escapeHtml(m.name || '—');
+  return (
+    `<div class="row">` +
+    `<span class="idx">${index + 1}</span>` +
+    `<span class="name">${name}</span>` +
+    `<span class="meta">TH${th}</span>` +
+    `<span class="meta">${attacks.length}/${atkPer}</span>` +
+    `<span class="stars">${stars}⭐</span>` +
+    `</div>`
+  );
 }
 
+/**
+ * Telegram widget profile (core.telegram.org/bots/widgets):
+ * - no inner scroll (overflow auto/scroll → hidden; content is clipped)
+ * - auto height from content, max 600px
+ * - fit long lists with tabs / fewer rows, not scroll
+ * - use theme CSS variables for native bubble look
+ */
 function buildWidgetHtml(resolved) {
   const { war, isCwl, cwlDay, cwlTotalDays } = resolved;
   const our = war.clan || {};
   const opp = war.opponent || {};
-  const ourMembers = sortMembers(our.members || []).slice(0, 15);
-  const enemyMembers = sortMembers(opp.members || []).slice(0, 15);
-  const teamSize = war.teamSize || ourMembers.length || 0;
+  // Keep short so total height stays under ~560px (docs recommendation)
+  const maxRows = 8;
+  const ourAll = sortMembers(our.members || []);
+  const oppAll = sortMembers(opp.members || []);
+  const ourMembers = ourAll.slice(0, maxRows);
+  const oppMembers = oppAll.slice(0, maxRows);
+  const teamSize = war.teamSize || ourAll.length || 0;
   const atkPer = getAttacksPerMember(war, Boolean(isCwl));
 
   const ourName = escapeHtml(stripEmojis(our.name || '—') || '—');
   const oppName = escapeHtml(stripEmojis(opp.name || '—') || '—');
   const ourStars = our.stars ?? 0;
   const oppStars = opp.stars ?? 0;
-  const ourDest = Number(our.destructionPercentage ?? 0);
-  const oppDest = Number(opp.destructionPercentage ?? 0);
-  const state = escapeHtml(warStateLabel(war.state));
+  const ourDest = Number(our.destructionPercentage ?? 0).toFixed(1);
+  const oppDest = Number(opp.destructionPercentage ?? 0).toFixed(1);
 
   let timeLine = '';
   if (war.state === 'preparation') {
@@ -62,142 +73,122 @@ function buildWidgetHtml(resolved) {
     if (f) timeLine = escapeHtml(f);
   }
 
+  const statusMap = {
+    preparation: 'آماده‌سازی',
+    inWar: 'در حال جنگ',
+    warEnded: 'پایان یافته',
+  };
+  const status =
+    statusMap[war.state] || escapeHtml(warStateLabel(war.state));
+
   const diff = ourStars - oppStars;
-  const diffLabel =
-    diff > 0 ? `+${diff} ستاره` : diff < 0 ? `${diff} ستاره` : 'مساوی';
-  const diffColor = diff > 0 ? '#70dfa0' : diff < 0 ? '#ff8a80' : '#9db2bd';
+  const diffText =
+    diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : '0';
 
-  // progress: relative share of stars (visual only)
-  const totalStars = Math.max(ourStars + oppStars, 1);
-  const barPct = Math.max(8, Math.min(92, Math.round((ourStars / totalStars) * 100)));
-
-  const statusLabel =
-    war.state === 'inWar'
-      ? '● در حال جنگ'
-      : war.state === 'preparation'
-        ? '● آماده‌سازی'
-        : war.state === 'warEnded'
-          ? '● پایان یافته'
-          : `● ${state}`;
-
-  const subtitleParts = [`${ourName} vs ${oppName}`];
+  let sub = `${ourName} vs ${oppName}`;
   if (isCwl && cwlDay) {
-    subtitleParts.push(
-      `CWL روز ${cwlDay}${cwlTotalDays ? '/' + cwlTotalDays : ''}`
-    );
+    sub += ` · CWL ${cwlDay}${cwlTotalDays ? '/' + cwlTotalDays : ''}`;
   }
-  if (timeLine) subtitleParts.push(timeLine);
-  const subtitle = subtitleParts.join(' · ');
+  if (timeLine) sub += ` · ${timeLine}`;
 
   const ourRows = ourMembers
-    .map((m, i) => {
-      const s = memberStats(m, atkPer);
-      return `<div class="player"><div class="pi"><div class="av">${i + 1}</div><div><div class="nm">${s.name}</div><div class="tg">TH${s.th}</div></div></div><div class="st"><div>${s.attacks}/${s.atkPer}</div><div class="ss">${s.stars}⭐</div></div></div>`;
-    })
+    .map((m, i) => memberLine(m, i, atkPer))
     .join('');
-
-  const enemyRows = enemyMembers
-    .map((m, i) => {
-      const s = memberStats(m, atkPer);
-      return `<div class="player"><div class="pi"><div class="av e">${i + 1}</div><div><div class="nm">${s.name}</div><div class="tg">TH${s.th}</div></div></div><div class="st"><div>${s.attacks}/${s.atkPer}</div><div class="ss">${s.stars}⭐</div></div></div>`;
-    })
+  const oppRows = oppMembers
+    .map((m, i) => memberLine(m, i, atkPer))
     .join('');
 
   const ourMore =
-    (our.members || []).length > ourMembers.length
-      ? `<div class="more">+${(our.members || []).length - ourMembers.length} عضو دیگر</div>`
+    ourAll.length > maxRows
+      ? `<p class="hint">+${ourAll.length - maxRows} عضو دیگر</p>`
       : '';
-  const enemyMore =
-    (opp.members || []).length > enemyMembers.length
-      ? `<div class="more">+${(opp.members || []).length - enemyMembers.length} عضو دیگر</div>`
+  const oppMore =
+    oppAll.length > maxRows
+      ? `<p class="hint">+${oppAll.length - maxRows} عضو دیگر</p>`
       : '';
 
-  // Scrollable dashboard; keep CSS/JS minimal for 4KB zlib limit
-  return `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+  // No fixed height wrapper, no overflow scroll (unsupported).
+  // Tabs switch pages so content stays within 600px.
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+<meta charset="utf-8"/>
 <style>
-html,body{height:100%;margin:0}
-body{background:#101a22;color:#edf4f5;font:13px/1.35 Arial,sans-serif;overflow:hidden}
-.scroll{height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
-.wrap{max-width:650px;margin:0 auto;padding:10px}
-.dash{background:#182630;border:1px solid #30434e;border-radius:16px;overflow:hidden}
-.hd{background:#172d3a;padding:14px}
-.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-h2{margin:0;font-size:16px}
-.badge{background:#194d39;color:#75e6a4;padding:5px 10px;border-radius:16px;font-size:11px;white-space:nowrap}
-.sub{color:#9db2bd;font-size:11px;margin:10px 0 12px}
-.teams{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.team{background:#25483f;border-radius:12px;padding:10px}
-.team.en{background:#34404b}
-.team small{color:#c3d8ce;font-size:11px}
-.score{font-size:24px;font-weight:700;margin:6px 0;color:#70dfa0}
-.team.en .score{color:#fff}
-.plab{display:flex;justify-content:space-between;margin-top:12px;font-size:11px;color:#d3e2e8}
-.bar{height:6px;background:#40535c;border-radius:8px;overflow:hidden;margin-top:6px}
-.bar>i{display:block;height:100%;background:#55ce8a;width:${barPct}%}
-.ct{padding:12px}
-.tabs{display:flex;gap:6px;margin-bottom:12px}
-.tab{flex:1;border:0;border-radius:10px;padding:10px 4px;background:#293943;color:#c0d0d8;font-size:12px}
-.tab.on{background:#244d3c;color:#70dfa0;font-weight:700}
-.sec{font-size:13px;font-weight:700;margin:0 0 10px}
-.player{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#243640;border-radius:10px;padding:10px;margin-bottom:6px}
-.pi{display:flex;align-items:center;gap:8px;min-width:0}
-.av{width:28px;height:28px;border-radius:50%;background:#526e85;display:grid;place-items:center;font-size:11px;font-weight:700;flex:0 0 auto}
-.av.e{background:#6b5b6b}
-.nm{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
-.tg{font-size:10px;color:#9db1bd;margin-top:2px}
-.st{text-align:left;font-size:11px;flex:0 0 auto}
-.ss{color:#70dfa0;margin-top:2px}
-.more,.ft{text-align:center;color:#7e99a5;font-size:10px;padding:6px 0}
-.ft{border-top:1px solid #344650;padding:10px}
+body{margin:0;padding:10px 12px 18px;font-size:14px;line-height:1.35}
+.hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+h3{margin:0;font-size:16px}
+.badge{font-size:12px;color:var(--tg-theme-accent-text-color,#70dfa0)}
+.sub{margin:0 0 10px;font-size:12px;color:var(--tg-theme-hint-color,#9db2bd)}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.card{background:var(--tg-theme-secondary-bg-color,#243640);border-radius:10px;padding:8px 10px}
+.card .lbl{font-size:11px;color:var(--tg-theme-hint-color,#9db2bd)}
+.card .sc{font-size:20px;font-weight:700;margin:4px 0;color:var(--tg-theme-accent-text-color,#70dfa0)}
+.card.en .sc{color:var(--tg-theme-text-color,#edf4f5)}
+.diff{font-size:12px;margin:0 0 10px;color:var(--tg-theme-hint-color,#9db2bd)}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+button{flex:1;padding:8px 4px;font-size:13px}
+button.on{outline:2px solid var(--tg-theme-button-color,#55ce8a)}
+.list .row{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--tg-theme-section-separator-color,#344650)}
+.list .row:last-child{border-bottom:0}
+.idx{width:18px;font-size:12px;color:var(--tg-theme-hint-color,#9db2bd);flex:0 0 auto}
+.name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.meta{font-size:11px;color:var(--tg-theme-hint-color,#9db2bd);flex:0 0 auto}
+.stars{font-size:12px;flex:0 0 auto}
+.hint{margin:6px 0 0;font-size:11px;color:var(--tg-theme-hint-color,#9db2bd)}
 .hid{display:none}
-</style></head><body>
-<div class="scroll"><div class="wrap"><div class="dash">
+</style>
+</head>
+<body>
 <div class="hd">
- <div class="top"><h2>⚔️ CLAN WAR</h2><span class="badge">${statusLabel}</span></div>
- <div class="sub">${subtitle}</div>
- <div class="teams">
-  <div class="team"><small>کلن شما</small><div class="score">${ourStars} ⭐</div><small>${ourDest.toFixed(1)}% تخریب</small></div>
-  <div class="team en"><small>حریف</small><div class="score">${oppStars} ⭐</div><small>${oppDest.toFixed(1)}% تخریب</small></div>
- </div>
- <div class="plab"><span>${teamSize}v${teamSize}</span><b style="color:${diffColor}">${diffLabel}</b></div>
- <div class="bar"><i></i></div>
+  <h3>⚔️ Clan War</h3>
+  <span class="badge">${status}</span>
 </div>
-<div class="ct">
- <div class="tabs">
-  <button class="tab on" type="button" data-t="m">بازیکنان</button>
-  <button class="tab" type="button" data-t="e">حریف</button>
- </div>
- <div id="m">
-  <div class="sec">اعضای وار</div>
-  ${ourRows || '<div class="more">عضوی نیست</div>'}
-  ${ourMore}
- </div>
- <div id="e" class="hid">
-  <div class="sec">تیم حریف</div>
-  ${enemyRows || '<div class="more">اطلاعات حریف نیست</div>'}
-  ${enemyMore}
- </div>
+<p class="sub">${sub}</p>
+<div class="teams">
+  <div class="card">
+    <div class="lbl">کلن شما</div>
+    <div class="sc">${ourStars} ⭐</div>
+    <div class="lbl">${ourDest}% · ${teamSize}v${teamSize}</div>
+  </div>
+  <div class="card en">
+    <div class="lbl">حریف</div>
+    <div class="sc">${oppStars} ⭐</div>
+    <div class="lbl">${oppDest}%</div>
+  </div>
 </div>
-<div class="ft">CLAN WAR WIDGET · TEST</div>
-</div></div></div>
+<p class="diff">اختلاف ستاره: <b>${diffText}</b></p>
+<div class="tabs">
+  <button type="button" class="on" data-t="m">بازیکنان</button>
+  <button type="button" data-t="e">حریف</button>
+</div>
+<div id="m" class="list">${ourRows || '<p class="hint">عضوی نیست</p>'}${ourMore}</div>
+<div id="e" class="list hid">${oppRows || '<p class="hint">اطلاعات حریف نیست</p>'}${oppMore}</div>
 <script>
-document.querySelectorAll('.tab').forEach(function(b){
- b.onclick=function(){
-  document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on')});
-  b.classList.add('on');
-  var t=b.getAttribute('data-t');
-  document.getElementById('m').classList.toggle('hid',t!=='m');
-  document.getElementById('e').classList.toggle('hid',t!=='e');
- };
-});
+(function(){
+  var tabs=document.querySelectorAll('button[data-t]');
+  var m=document.getElementById('m');
+  var e=document.getElementById('e');
+  for(var i=0;i<tabs.length;i++){
+    tabs[i].onclick=function(){
+      for(var j=0;j<tabs.length;j++) tabs[j].classList.remove('on');
+      this.classList.add('on');
+      var t=this.getAttribute('data-t');
+      m.className=t==='m'?'list':'list hid';
+      e.className=t==='e'?'list':'list hid';
+    };
+  }
+  if(window.TelegramWidget&&typeof TelegramWidget.ready==='function'){
+    TelegramWidget.ready();
+  }
+})();
 </script>
-</body></html>`;
+</body>
+</html>`;
 }
 
 function assertWidgetSize(html) {
   const compressed = zlib.deflateSync(Buffer.from(html, 'utf8'), {
-    level: zlib.constants.Z_BEST_COMPRESSION,
+    level: 9,
   });
   return {
     raw: Buffer.byteLength(html, 'utf8'),
@@ -240,30 +231,26 @@ module.exports = async function testwCommand(ctx) {
       );
     }
 
-    // Fixed taller viewport so inner .scroll can move
+    // height omitted → automatic content height (docs: 50–600px, no inner scroll)
     await withTelegramRetry(
       () =>
         ctx.telegram.callApi('sendWidget', {
           chat_id: ctx.chat.id,
           html,
-          height: 560,
-          caption: '🧪 تست Widget — داشبورد وار',
+          caption: '🧪 Widget test · auto height',
         }),
       { maxRetries: config.telegramMaxRetries }
     );
 
     await ctx.reply(
-      `✅ ویجت داشبورد ارسال شد.\n` +
-        `اندازه: raw ${size.raw}B · zlib ${size.compressed}B / 4096\n` +
-        `داخل ویجت باید اسکرول شود.`
+      `✅ ویجت ارسال شد (ارتفاع خودکار طبق داک).\n` +
+        `اندازه: raw ${size.raw}B · zlib ${size.compressed}B / 4096`
     );
   } catch (err) {
     console.error('[/testw]', err.message);
     const desc = err.description || err.message || String(err);
     return ctx.reply(
-      `❌ ارسال ویجت ناموفق بود:\n<code>${escapeHtml(desc)}</code>\n\n` +
-        `اگر گفت فقط private: در PV ربات دوباره /testw بزن.\n` +
-        `اگر method unknown: سرور تلگرام هنوز 10.4 را برای این بات فعال نکرده.`,
+      `❌ ارسال ویجت ناموفق بود:\n<code>${escapeHtml(desc)}</code>`,
       { parse_mode: 'HTML' }
     );
   }
