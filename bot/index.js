@@ -21,6 +21,7 @@ const clanCommand = require('../commands/clan');
 const statusCommand = require('../commands/status');
 const testNotifyCommand = require('../commands/testnotify');
 const testLogCommand = require('../commands/testlog');
+const testwCommand = require('../commands/testw');
 
 function createBot() {
   const bot = new Telegraf(config.botToken);
@@ -54,6 +55,7 @@ function createBot() {
   bot.command('status', statusCommand);
   bot.command('testnotify', testNotifyCommand);
   bot.command('testlog', testLogCommand);
+  bot.command('testw', testwCommand);
 
   bot.catch(async (err, ctx) => {
     console.error(`[Bot] Error for ${ctx.updateType}:`, err.message);
