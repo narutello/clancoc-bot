@@ -11,6 +11,7 @@ const {
   getAttacksPerMember,
 } = require('../utils/helpers');
 const { withTelegramRetry } = require('../utils/telegramSafe');
+const { checkCommandLimit } = require('../utils/commandRateLimit');
 
 function sortMembers(list) {
   return (list || [])
@@ -34,18 +35,10 @@ function memberLine(m, index, atkPer) {
   );
 }
 
-/**
- * Telegram widget profile (core.telegram.org/bots/widgets):
- * - no inner scroll (overflow auto/scroll → hidden; content is clipped)
- * - auto height from content, max 600px
- * - fit long lists with tabs / fewer rows, not scroll
- * - use theme CSS variables for native bubble look
- */
 function buildWidgetHtml(resolved) {
   const { war, isCwl, cwlDay, cwlTotalDays } = resolved;
   const our = war.clan || {};
   const opp = war.opponent || {};
-  // Keep short so total height stays under ~560px (docs recommendation)
   const maxRows = 8;
   const ourAll = sortMembers(our.members || []);
   const oppAll = sortMembers(opp.members || []);
@@ -107,8 +100,6 @@ function buildWidgetHtml(resolved) {
       ? `<p class="hint">+${oppAll.length - maxRows} عضو دیگر</p>`
       : '';
 
-  // No fixed height wrapper, no overflow scroll (unsupported).
-  // Tabs switch pages so content stays within 600px.
   return `<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
@@ -198,29 +189,29 @@ function assertWidgetSize(html) {
 }
 
 module.exports = async function testwCommand(ctx) {
-  const fromId = ctx.from?.id;
-  if (!fromId || String(fromId) !== String(config.ownerTelegramId)) {
-    return ctx.reply('⛔ این دستور فقط برای اونر ربات است.');
-  }
-
-  const chatType = ctx.chat?.type;
-  if (chatType && chatType !== 'private') {
-    await ctx.reply(
-      '⚠️ در production ویجت فعلاً فقط در چت خصوصی پشتیبانی می‌شود.\n' +
-        'همین دستور را در PV ربات بزن.'
-    );
-  }
-
   try {
+    const userId = ctx.from?.id;
+    const isOwner =
+      userId != null && Number(userId) === Number(config.ownerTelegramId);
+    const limit = checkCommandLimit(userId, 'testw', {
+      limit: config.warCmdLimit,
+      windowMs: config.warCmdWindowMs,
+      isOwner,
+    });
+    if (!limit.allowed) {
+      return ctx.reply(
+        `⏳ تعداد درخواست زیاد است. حدود <b>${limit.retryAfterSec}</b> ثانیه دیگر دوباره بزن.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
     let resolved = await resolveRegularWar();
     if (!resolved || !resolved.war) {
       resolved = await resolveCwlWar();
     }
 
     if (!resolved || !resolved.war) {
-      return ctx.reply(
-        'در حال حاضر کلن در وار / CWL نیست — برای تست ویجت چیزی برای نمایش نیست.'
-      );
+      return ctx.reply('در حال حاضر کلن در وار / CWL نیست.');
     }
 
     const html = buildWidgetHtml(resolved);
@@ -231,24 +222,34 @@ module.exports = async function testwCommand(ctx) {
       );
     }
 
-    // height omitted → automatic content height (docs: 50–600px, no inner scroll)
     await withTelegramRetry(
       () =>
         ctx.telegram.callApi('sendWidget', {
           chat_id: ctx.chat.id,
           html,
-          caption: '🧪 Widget test · auto height',
+          caption: '⚔️ وضعیت وار (Widget)',
         }),
       { maxRetries: config.telegramMaxRetries }
     );
-
-    await ctx.reply(
-      `✅ ویجت ارسال شد (ارتفاع خودکار طبق داک).\n` +
-        `اندازه: raw ${size.raw}B · zlib ${size.compressed}B / 4096`
-    );
   } catch (err) {
     console.error('[/testw]', err.message);
-    const desc = err.description || err.message || String(err);
+    const desc = String(err.description || err.message || err);
+    const lower = desc.toLowerCase();
+
+    // Production often still blocks widgets outside private chats
+    if (
+      lower.includes('private') ||
+      lower.includes('chat_id') ||
+      lower.includes('forbidden') ||
+      lower.includes('not available') ||
+      lower.includes('group')
+    ) {
+      return ctx.reply(
+        '⚠️ تلگرام فعلاً ویجت را در این نوع چت پشتیبانی نمی‌کند.\n' +
+          'در چت خصوصی با ربات /testw را بزن، یا از /war استفاده کن.'
+      );
+    }
+
     return ctx.reply(
       `❌ ارسال ویجت ناموفق بود:\n<code>${escapeHtml(desc)}</code>`,
       { parse_mode: 'HTML' }
