@@ -10,29 +10,71 @@ const {
   buildCwlLeagueKey,
 } = require('./cwlService');
 
-async function buildThanksMentionsHtml(rosterTags) {
-  if (!rosterTags || rosterTags.length === 0) return '';
-  const linksMap = await getLinksForTags(rosterTags);
+/** Minimum attack stars across the league to appear in special thanks */
+const THANKS_MIN_STARS = 15;
+
+/**
+ * Mention only linked Telegram users for the given clash tags.
+ * Prefer @username; otherwise clickable first_name / in-game name (never the word «منشن»).
+ */
+async function buildThanksMentionsHtml(playerStarsMap) {
+  const entries = Object.entries(playerStarsMap || {})
+    .map(([tag, info]) => ({
+      tag: normalizeTag(tag),
+      stars: Number(info?.stars) || 0,
+      name: info?.name || tag,
+    }))
+    .filter((e) => e.tag && e.stars >= THANKS_MIN_STARS)
+    .sort((a, b) => b.stars - a.stars);
+
+  if (!entries.length) {
+    return `<p>💚 از همه اعضای کلن بابت تلاش این فصل ممنونیم.</p>`;
+  }
+
+  const tags = entries.map((e) => e.tag);
+  const linksMap = await getLinksForTags(tags);
+  const nameByTag = new Map(entries.map((e) => [e.tag, e.name]));
+
   const seenIds = new Set();
   const parts = [];
-  for (const tag of rosterTags) {
-    const key = normalizeTag(tag);
-    const links = linksMap.get(key) || linksMap.get(tag) || [];
+
+  for (const e of entries) {
+    const links = linksMap.get(e.tag) || [];
     for (const u of links) {
       const id = u.telegram_id;
       if (id == null || seenIds.has(id)) continue;
       seenIds.add(id);
+
       if (u.username) {
+        // Real @username, still deep-linked so notification works in groups
         parts.push(
           `<a href="tg://user?id=${id}">@${escapeHtml(u.username)}</a>`
         );
       } else {
-        parts.push(tgUserLink(id, u.first_name || 'منشن'));
+        // No public username → Telegram cannot show @handle; use name (opens profile)
+        const label =
+          (u.first_name && String(u.first_name).trim()) ||
+          nameByTag.get(e.tag) ||
+          'بازیکن';
+        parts.push(tgUserLink(id, label));
       }
     }
   }
-  if (!parts.length) return '';
-  return `<p>🙏 ممنون از همه کسانی که این فصل جنگیدن:<br/>${parts.join(' · ')}</p>`;
+
+  if (!parts.length) {
+    // Eligible by stars but nobody linked their account
+    return (
+      `<p>⭐ این فصل چند نفر حداقل ${THANKS_MIN_STARS} ستاره گرفتند؛ ` +
+      `برای منشن شدن اکانت‌شان را به ربات لینک کنند.</p>` +
+      `<p>💚 از بقیه اعضای کلن هم ممنونیم.</p>`
+    );
+  }
+
+  return (
+    `<p>⭐ با تشکر ویژه از کسانی که حداقل <b>${THANKS_MIN_STARS}</b> ستاره گرفتند:<br/>` +
+    `${parts.join(' · ')}</p>` +
+    `<p>💚 و از بقیه اعضای کلن هم بابت همراهی این فصل ممنونیم.</p>`
+  );
 }
 
 function buildLeagueEndStandingsTable(standings) {
@@ -54,9 +96,6 @@ function buildLeagueEndStandingsTable(standings) {
     .join('');
 }
 
-/**
- * یک‌بار در پایان فصل لیگ: جدول نهایی + تشکر از اعضای roster (لینک‌شده).
- */
 async function notifyCwlLeagueEnded(bot, found, { hasNotification, markNotification, sendToGroup }) {
   let data;
   try {
@@ -102,7 +141,7 @@ async function notifyCwlLeagueEnded(bot, found, { hasNotification, markNotificat
     ? `<p>🏅 رتبه کلن ما: <b>${our.rank} از ${totalClans}</b><br/>⭐ مجموع ستاره: <b>${our.stars}</b><br/>🏆 تعداد برد: <b>${our.wins}</b></p>`
     : '';
 
-  const thanks = await buildThanksMentionsHtml(data.ourRosterTags || []);
+  const thanks = await buildThanksMentionsHtml(data.ourPlayerStars || {});
   const rows = buildLeagueEndStandingsTable(data.standings);
 
   const html = `<h2>🏁 لیگ کلن‌ها به پایان رسید!</h2>
