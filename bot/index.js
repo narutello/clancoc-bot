@@ -8,6 +8,10 @@ const helpCommand = require('../commands/help');
 const linkCommand = require('../commands/link');
 const unlinkCommand = require('../commands/unlink');
 const unlinkAllCommand = require('../commands/unlinkall');
+const {
+  unlinkAllConfirmAction,
+  unlinkAllCancelAction,
+} = unlinkAllCommand;
 const myAccountsCommand = require('../commands/myaccounts');
 const warCommand = require('../commands/war');
 const { warEnemyAction, warHomeAction } = warCommand;
@@ -26,7 +30,6 @@ const testwCommand = require('../commands/testw');
 function createBot() {
   const bot = new Telegraf(config.botToken);
 
-  // هر تعامل (دستور، دکمه، استارت) → ذخیره/به‌روزرسانی پروفایل تلگرام
   bot.use(async (ctx, next) => {
     const user = ctx.from;
     if (user && user.id) {
@@ -43,6 +46,8 @@ function createBot() {
   bot.command('link', linkCommand);
   bot.command('unlink', unlinkCommand);
   bot.command('unlinkall', unlinkAllCommand);
+  bot.action(/^unlinkall:confirm:\d+$/, unlinkAllConfirmAction);
+  bot.action(/^unlinkall:cancel:\d+$/, unlinkAllCancelAction);
   bot.command('myaccounts', myAccountsCommand);
   bot.command('war', warCommand);
   bot.action('war:enemy', warEnemyAction);
