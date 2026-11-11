@@ -6,6 +6,7 @@ const { startWarMonitor, stopWarMonitor } = require('./services/warMonitor');
 const { pool } = require('./database');
 const { tgLog } = require('./utils/telegramLogger');
 const { getMonitorStats } = require('./services/monitorStats');
+const { initI18n } = require('./utils/i18n');
 
 const bootAt = Date.now();
 let botReady = false;
@@ -83,7 +84,6 @@ function startHealthServer(port) {
         return;
       }
 
-      // Hosts sometimes probe arbitrary paths — stay 200 so deploys are not flaky
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('ClanCoC Bot is running');
     } catch (err) {
@@ -107,6 +107,14 @@ async function main() {
   console.log('========================================');
   console.log(`[INFO] LOG_TELEGRAM_ID=${config.logTelegramId || '(not set)'}`);
   console.log(`[INFO] TELEGRAM_GROUP_ID=${config.telegramGroupId || '(not set)'}`);
+
+  try {
+    await initI18n();
+    console.log('[OK] i18n ready (fa, en)');
+  } catch (err) {
+    console.error('[FAIL] i18n init:', err.message);
+    process.exit(1);
+  }
 
   try {
     await migrate();

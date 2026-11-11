@@ -1,16 +1,18 @@
+const { t, DEFAULT_LANG, normalizeLang } = require('./i18n');
+
 function normalizeTag(tag) {
   if (!tag) return null;
   return String(tag).replace(/^#/, '').toUpperCase().replace(/O/g, '0');
 }
 
 function isValidTag(tag) {
-  const t = normalizeTag(tag);
-  return t && /^[0289PYLQGRJCUV]{3,15}$/.test(t);
+  const x = normalizeTag(tag);
+  return x && /^[0289PYLQGRJCUV]{3,15}$/.test(x);
 }
 
 function formatTag(tag) {
-  const t = normalizeTag(tag);
-  return t ? `#${t}` : '';
+  const x = normalizeTag(tag);
+  return x ? `#${x}` : '';
 }
 
 function escapeHtml(text) {
@@ -27,11 +29,16 @@ function tgUserLink(telegramId, displayName) {
   return `<a href="tg://user?id=${telegramId}">${name}</a>`;
 }
 
-function formatDuration(ms) {
+function formatDuration(ms, lang = DEFAULT_LANG) {
   if (!ms || ms < 0) return '—';
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
+  const lng = normalizeLang(lang) || DEFAULT_LANG;
+  if (lng === 'en') {
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m} min`;
+  }
   if (h > 0) return `${h}س ${m}د`;
   return `${m} دقیقه`;
 }
@@ -62,17 +69,18 @@ function stripEmojis(text) {
     .trim();
 }
 
-function formatWarTime(date) {
+function formatWarTime(date, lang = DEFAULT_LANG) {
   if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
 
-  const options = {
+  const lng = normalizeLang(lang) || DEFAULT_LANG;
+  const locale = lng === 'en' ? 'en-GB' : 'fa-IR';
+
+  const timeStr = date.toLocaleTimeString(locale, {
     timeZone: 'Asia/Tehran',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  };
-
-  const timeStr = date.toLocaleTimeString('fa-IR', options);
+  });
 
   const today = new Date();
   const tomorrow = new Date();
@@ -94,37 +102,35 @@ function formatWarTime(date) {
   );
 
   if (isSameDay(dateTehran, todayTehran)) {
-    return `امروز ساعت ${timeStr}`;
+    return t('time.today', { lng, time: timeStr });
   }
   if (isSameDay(dateTehran, tomorrowTehran)) {
-    return `فردا ساعت ${timeStr}`;
+    return t('time.tomorrow', { lng, time: timeStr });
   }
 
-  const weekday = date.toLocaleDateString('fa-IR', {
+  const weekday = date.toLocaleDateString(locale, {
     timeZone: 'Asia/Tehran',
     weekday: 'long',
   });
-  return `${weekday} ساعت ${timeStr}`;
+  return t('time.weekday', { lng, weekday, time: timeStr });
 }
 
-function warStateLabel(state) {
-  const map = {
-    notInWar: 'خارج از وار',
-    preparation: 'آماده‌سازی',
-    inWar: 'در حال نبرد',
-    warEnded: 'پایان یافته',
-  };
-  return map[state] || state || 'نامشخص';
+function warStateLabel(state, lang = DEFAULT_LANG) {
+  const lng = normalizeLang(lang) || DEFAULT_LANG;
+  const key = `state.${state}`;
+  const translated = t(key, { lng });
+  if (translated === key) return t('state.unknown', { lng });
+  return translated;
 }
 
-function resultLabel(result) {
-  if (result === 'win') return '🏆 برد';
-  if (result === 'lose') return '❌ باخت';
-  if (result === 'tie') return '🤝 مساوی';
+function resultLabel(result, lang = DEFAULT_LANG) {
+  const lng = normalizeLang(lang) || DEFAULT_LANG;
+  if (result === 'win') return t('result.win', { lng });
+  if (result === 'lose') return t('result.lose', { lng });
+  if (result === 'tie') return t('result.tie', { lng });
   return result || '—';
 }
 
-/** تعداد حمله مجاز هر بازیکن: CWL=1 ، وار معمولی=2 */
 function getAttacksPerMember(war, isCwl = false) {
   if (isCwl) return 1;
   if (war && war.attacksPerMember != null && war.attacksPerMember > 0) {
