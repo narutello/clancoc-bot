@@ -62,5 +62,18 @@
     "log_fail": "❌ ارسال به کانال لاگ ناموفق بود: {{message}}",
     "col_item": "مورد",
     "col_value": "مقدار"
+  },
+  "testw": {
+    "more_members": "عضو دیگر",
+    "our_clan": "کلن شما",
+    "star_diff": "اختلاف ستاره",
+    "tab_players": "بازیکنان",
+    "no_members": "عضوی نیست",
+    "no_enemy": "اطلاعات حریف نیست",
+    "not_in_war": "در حال حاضر کلن در وار / CWL نیست.",
+    "too_large": "❌ HTML ویجت از حد مجاز بزرگ‌تر است (raw={{raw}}, zlib={{zlib}}).",
+    "caption": "⚔️ وضعیت وار (Widget)",
+    "chat_unsupported": "⚠️ تلگرام فعلاً ویجت را در این نوع چت پشتیبانی نمی‌کند.\nدر چت خصوصی با ربات /testw را بزن، یا از /war استفاده کن.",
+    "send_fail": "❌ ارسال ویجت ناموفق بود:\n<code>{{message}}</code>"
   }
 }

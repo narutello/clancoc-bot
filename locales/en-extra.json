@@ -62,5 +62,18 @@
     "log_fail": "❌ Failed to send to log channel: {{message}}",
     "col_item": "Item",
     "col_value": "Value"
+  },
+  "testw": {
+    "more_members": "more members",
+    "our_clan": "Your clan",
+    "star_diff": "Star difference",
+    "tab_players": "Players",
+    "no_members": "No members",
+    "no_enemy": "Enemy roster unavailable",
+    "not_in_war": "The clan is not in war / CWL right now.",
+    "too_large": "❌ Widget HTML is too large (raw={{raw}}, zlib={{zlib}}).",
+    "caption": "⚔️ War status (Widget)",
+    "chat_unsupported": "⚠️ Telegram does not support widgets in this chat type yet.\nTry /testw in a private chat with the bot, or use /war.",
+    "send_fail": "❌ Failed to send widget:\n<code>{{message}}</code>"
   }
 }
