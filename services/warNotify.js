@@ -8,6 +8,8 @@ const {
   stripEmojis,
   getAttacksPerMember,
 } = require('../utils/helpers');
+const { t, isRtl } = require('../utils/i18n');
+const { getChatLanguage } = require('./settingsService');
 const { formatCwlDayLabel, buildCwlLeagueKey } = require('./cwlService');
 const {
   hasNotification,
@@ -23,7 +25,16 @@ const {
   buildWarRichHtml,
 } = require('./warHtml');
 
-async function sendToGroup(bot, html) {
+async function groupLang() {
+  if (!config.telegramGroupId) return 'fa';
+  try {
+    return await getChatLanguage(config.telegramGroupId);
+  } catch {
+    return 'fa';
+  }
+}
+
+async function sendToGroup(bot, html, lang = 'fa') {
   if (!config.telegramGroupId) {
     console.warn('[WarMonitor] TELEGRAM_GROUP_ID not set, skipping notification');
     await tgLog.warn(
@@ -38,7 +49,7 @@ async function sendToGroup(bot, html) {
       () =>
         bot.telegram.callApi('sendRichMessage', {
           chat_id: config.telegramGroupId,
-          rich_message: { html, is_rtl: true },
+          rich_message: { html, is_rtl: isRtl(lang) },
         }),
       { maxRetries: config.telegramMaxRetries }
     );
@@ -52,7 +63,7 @@ async function sendToGroup(bot, html) {
         () =>
           bot.telegram.sendMessage(
             config.telegramGroupId,
-            'War notice (client does not support Rich Message)',
+            t('notify.fallback_plain', { lng: lang }),
             { disable_web_page_preview: true }
           ),
         { maxRetries: config.telegramMaxRetries }
@@ -70,9 +81,10 @@ async function notifyPreparation(bot, war) {
   const warKey = buildWarKey(war);
   const event = 'preparation';
   if (await hasNotification(warKey, event)) return;
-  const title = '⚔️ حریف پیدا شد — آماده‌سازی شروع شد!';
-  const html = await buildWarRichHtml(war, title, '', null);
-  await sendToGroup(bot, html);
+  const lang = await groupLang();
+  const title = t('notify.prep_title', { lng: lang });
+  const html = await buildWarRichHtml(war, title, '', null, lang);
+  await sendToGroup(bot, html, lang);
   await tgLog.info('Notification sent: preparation started', null, {
     module: 'WarMonitor',
   });
@@ -85,9 +97,10 @@ async function notifyCwlLeagueStart(bot, war, meta) {
   const leagueKey = buildCwlLeagueKey(meta.cwlSeason);
   const event = 'cwl_league_preparation';
   if (await hasNotification(leagueKey, event)) return;
-  const title = '🏟 لیگ کلن‌ها شروع شد — آماده‌سازی روز اول';
-  const html = await buildWarRichHtml(war, title, '', meta);
-  await sendToGroup(bot, html);
+  const lang = await groupLang();
+  const title = t('notify.cwl_league_start', { lng: lang });
+  const html = await buildWarRichHtml(war, title, '', meta, lang);
+  await sendToGroup(bot, html, lang);
   await tgLog.info(
     'Notification sent: CWL league start (day 1 preparation)',
     null,
@@ -100,14 +113,27 @@ async function notifyBattleStart(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_battle_start' : 'battle_start';
   if (await hasNotification(warKey, event)) return;
+  const lang = await groupLang();
   const members = extractMembers(war);
   const attacksUsed = countAttacks(members);
   const maxAttacks =
     (war.teamSize || members.length) * getAttacksPerMember(war, isCwl);
-  const extra = `<p>⚔️ حمله‌ها: <b>${attacksUsed}/${maxAttacks}</b></p>`;
-  const title = `🔥 روز نبرد شروع شد!${isCwl ? ' (CWL)' : ''}`;
-  const html = await buildWarRichHtml(war, title, extra, war.__cwlMeta || null);
-  await sendToGroup(bot, html);
+  const extra = `<p>${t('war.attacks_line', {
+    lng: lang,
+    used: attacksUsed,
+    max: maxAttacks,
+  })}</p>`;
+  const title = isCwl
+    ? t('notify.battle_start_cwl', { lng: lang })
+    : t('notify.battle_start', { lng: lang });
+  const html = await buildWarRichHtml(
+    war,
+    title,
+    extra,
+    war.__cwlMeta || null,
+    lang
+  );
+  await sendToGroup(bot, html, lang);
   await tgLog.info(
     'Notification sent: battle started' + (isCwl ? ' (CWL)' : ''),
     null,
@@ -127,6 +153,7 @@ async function notifyOneHourLeft(bot, war, isCwl = false) {
   const msLeft = end.getTime() - Date.now();
   if (msLeft < 50 * 60 * 1000 || msLeft > 70 * 60 * 1000) return;
 
+  const lang = await groupLang();
   const our = war.clan || {};
   const their = war.opponent || {};
   const ourName = stripEmojis(our.name || '—') || '—';
@@ -142,32 +169,42 @@ async function notifyOneHourLeft(bot, war, isCwl = false) {
   let pendingHtml;
   let pendingCount = 0;
   if (!isCwl && teamSize > 0 && ourStars >= maxStars) {
-    pendingHtml = '<p>✅ همه ستاره‌ها گرفته شده است.</p>';
+    pendingHtml = `<p>${t('notify.pending_all_stars', { lng: lang })}</p>`;
   } else {
-    pendingHtml = await buildPendingAttackersHtml(members, atkPer);
+    pendingHtml = await buildPendingAttackersHtml(members, atkPer, lang);
     pendingCount = getPendingAttackers(members, atkPer).length;
   }
 
   const dayLine =
     war.__cwlMeta && war.__cwlMeta.cwlDay
-      ? `<p>📅 ${formatCwlDayLabel(war.__cwlMeta.cwlDay, war.__cwlMeta.cwlTotalDays)} لیگ کلن‌ها</p>`
+      ? `<p>📅 ${formatCwlDayLabel(
+          war.__cwlMeta.cwlDay,
+          war.__cwlMeta.cwlTotalDays,
+          lang
+        )} CWL</p>`
       : '';
 
   const footer =
-    pendingCount > 0 ? '<p>حمله‌هاتون رو فراموش نکنید.</p>' : '';
+    pendingCount > 0
+      ? `<p>${t('notify.pending_footer', { lng: lang })}</p>`
+      : '';
 
-  const html = `<h2>⏰ ۱ ساعت تا پایان وار${isCwl ? ' (CWL)' : ''}</h2>
+  const title = isCwl
+    ? t('notify.one_hour_cwl', { lng: lang })
+    : t('notify.one_hour', { lng: lang });
+
+  const html = `<h2>${title}</h2>
 ${dayLine}
 <table bordered striped compact>
-<tr><th>کلن</th><th>ستاره</th><th>تخریب</th></tr>
+<tr><th>${t('common.clan', { lng: lang })}</th><th>${t('common.stars', { lng: lang })}</th><th>${t('common.destruction', { lng: lang })}</th></tr>
 <tr><td>🏰 ${escapeHtml(ourName)}</td><td>${ourStars} ⭐</td><td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td></tr>
 <tr><td>⚡ ${escapeHtml(oppName)}</td><td>${their.stars ?? 0} ⭐</td><td>${(their.destructionPercentage ?? 0).toFixed(1)}%</td></tr>
 </table>
-<p>⚔️ حمله‌ها: <b>${attacksUsed}/${maxAttacks}</b></p>
+<p>${t('war.attacks_line', { lng: lang, used: attacksUsed, max: maxAttacks })}</p>
 ${pendingHtml}
 ${footer}`.trim();
 
-  await sendToGroup(bot, html);
+  await sendToGroup(bot, html, lang);
   await tgLog.info(
     'Notification sent: 1 hour left' +
       (isCwl ? ' (CWL)' : '') +
@@ -184,6 +221,7 @@ async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
   if (!warKey) return;
   const event = isCwl ? 'cwl_war_ended' : 'war_ended';
   if (await hasNotification(warKey, event)) return;
+  const lang = await groupLang();
   const ourStars = last.our_stars ?? 0;
   const theirStars = last.their_stars ?? 0;
   const ourDest = Number(last.our_destruction ?? 0);
@@ -193,15 +231,21 @@ async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
   else if (ourStars < theirStars) result = 'lose';
   else if (ourDest > theirDest) result = 'win';
   else if (ourDest < theirDest) result = 'lose';
-  const html = `<h2>🏁 وار به پایان رسید!${isCwl ? ' (CWL)' : ''}</h2>
-<p><i>ربات هنگام پایان آفلاین بود؛ نتیجه از آخرین وضعیت ذخیره‌شده:</i></p>
+  const title = isCwl
+    ? t('notify.war_ended_cwl', { lng: lang })
+    : t('notify.war_ended', { lng: lang });
+  const html = `<h2>${title}</h2>
+<p><i>${t('notify.offline_note', { lng: lang })}</i></p>
 <table bordered striped compact>
-<tr><th>کلن</th><th>ستاره</th><th>تخریب</th></tr>
-<tr><td>🏰 کلن ما</td><td>${ourStars} ⭐</td><td>${ourDest.toFixed(1)}%</td></tr>
-<tr><td>⚡ حریف</td><td>${theirStars} ⭐</td><td>${theirDest.toFixed(1)}%</td></tr>
+<tr><th>${t('common.clan', { lng: lang })}</th><th>${t('common.stars', { lng: lang })}</th><th>${t('common.destruction', { lng: lang })}</th></tr>
+<tr><td>🏰 ${t('common.our_clan', { lng: lang })}</td><td>${ourStars} ⭐</td><td>${ourDest.toFixed(1)}%</td></tr>
+<tr><td>⚡ ${t('common.opponent', { lng: lang })}</td><td>${theirStars} ⭐</td><td>${theirDest.toFixed(1)}%</td></tr>
 </table>
-<p>نتیجه: <b>${resultLabel(result)}</b></p>`.trim();
-  await sendToGroup(bot, html);
+<p>${t('notify.result_line', {
+    lng: lang,
+    result: resultLabel(result, lang),
+  })}</p>`.trim();
+  await sendToGroup(bot, html, lang);
   await tgLog.info(
     'Notification sent: war ended (from saved state)' + (isCwl ? ' (CWL)' : ''),
     null,
@@ -214,6 +258,7 @@ async function notifyWarEnded(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_war_ended' : 'war_ended';
   if (await hasNotification(warKey, event)) return;
+  const lang = await groupLang();
   const our = war.clan || {};
   const their = war.opponent || {};
   let result = 'tie';
@@ -223,10 +268,21 @@ async function notifyWarEnded(bot, war, isCwl = false) {
     result = 'win';
   else if ((our.destructionPercentage || 0) < (their.destructionPercentage || 0))
     result = 'lose';
-  const extra = `<p>نتیجه: <b>${resultLabel(result)}</b></p>`;
-  const title = `🏁 وار به پایان رسید!${isCwl ? ' (CWL)' : ''}`;
-  const html = await buildWarRichHtml(war, title, extra, war.__cwlMeta || null);
-  await sendToGroup(bot, html);
+  const extra = `<p>${t('notify.result_line', {
+    lng: lang,
+    result: resultLabel(result, lang),
+  })}</p>`;
+  const title = isCwl
+    ? t('notify.war_ended_cwl', { lng: lang })
+    : t('notify.war_ended', { lng: lang });
+  const html = await buildWarRichHtml(
+    war,
+    title,
+    extra,
+    war.__cwlMeta || null,
+    lang
+  );
+  await sendToGroup(bot, html, lang);
   await tgLog.info(
     'Notification sent: war ended' + (isCwl ? ' (CWL)' : ''),
     null,
@@ -243,4 +299,5 @@ module.exports = {
   notifyOneHourLeft,
   notifyWarEndedFromSaved,
   notifyWarEnded,
+  groupLang,
 };

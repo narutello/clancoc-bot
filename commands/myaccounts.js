@@ -1,24 +1,24 @@
-const { getUserAccounts, upsertTelegramUser } = require('../services/linkService');
-const { formatTag, escapeHtml } = require('../utils/helpers');
+const { listLinks, upsertTelegramUser } = require('../services/linkService');
+const { formatTag } = require('../utils/helpers');
 
 module.exports = async function myAccountsCommand(ctx) {
   const from = ctx.from;
   await upsertTelegramUser(from);
 
   try {
-    const accounts = await getUserAccounts(from.id);
-    if (accounts.length === 0) {
-      return ctx.reply('هنوز هیچ اکانتی لینک نکرده‌اید.\nاز /link #TAG استفاده کنید.');
+    const links = await listLinks(from.id);
+    if (!links.length) {
+      return ctx.reply(ctx.t('myaccounts.empty'));
     }
-
-    const lines = accounts.map((a, i) => {
-      const name = a.name ? escapeHtml(a.name) : '—';
-      return `${i + 1}. <b>${name}</b> — ${formatTag(a.tag)}`;
-    });
-
-    const text = `📋 <b>اکانت‌های لینک‌شده شما:</b>\n\n${lines.join('\n')}`;
-    return ctx.reply(text, { parse_mode: 'HTML' });
+    const list = links
+      .map((row, i) => {
+        const tag = formatTag(row.clash_tag || row.tag);
+        const name = row.name ? ` — ${row.name}` : '';
+        return `${i + 1}. ${tag}${name}`;
+      })
+      .join('\n');
+    return ctx.reply(ctx.t('myaccounts.title', { list }));
   } catch (err) {
-    return ctx.reply(`❌ خطا: ${err.message}`);
+    return ctx.reply(ctx.t('common.error', { message: err.message }));
   }
 };
