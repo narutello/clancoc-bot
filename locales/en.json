@@ -1,1 +1,205 @@
-PLACEHOLDER_EN
+{
+  "common": {
+    "error": "❌ Error: {{message}}",
+    "generic_error": "⚠️ Something went wrong. Please try again later.",
+    "loading": "⏳ Loading...",
+    "denied": "⛔️ Access denied.",
+    "owner_only": "⛔️ This command is owner-only.",
+    "back": "↩️ Back",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "clan": "Clan",
+    "stars": "Stars",
+    "destruction": "Destruction",
+    "player": "Player",
+    "attack": "Attacks",
+    "defense": "Defense",
+    "status": "Status",
+    "opponent": "Opponent",
+    "our_clan": "Our clan",
+    "members": "Members",
+    "war_members": "War members",
+    "enemy_members": "Enemy members",
+    "th": "TH",
+    "rank": "#",
+    "player_fallback": "Player"
+  },
+  "lang": {
+    "fa": "Persian",
+    "en": "English",
+    "name": {
+      "fa": "🇮🇷 فارسی",
+      "en": "🇬🇧 English"
+    }
+  },
+  "settings": {
+    "title_group": "⚙️ Group settings",
+    "title_private": "⚙️ Personal settings",
+    "menu_language": "🌐 Language | زبان",
+    "current_language": "Current language: <b>{{language}}</b>",
+    "choose_language": "Choose your language:",
+    "saved": "✅ Language saved: <b>{{language}}</b>",
+    "denied": "⛔️ Only group admins and the bot owner can change settings.",
+    "private_only_self": "You can only change your own settings.",
+    "open_failed": "⚠️ Could not open settings."
+  },
+  "start": {
+    "message": "Hi 👋\n\nI'm a Clash of Clans clan war management bot.\n\n🔹 Features:\n• Auto monitoring for regular wars and CWL\n• Start / end / 1-hour-left notifications\n• In CWL, preparation notice only at league start\n• Link Clash accounts to Telegram\n• /war for regular wars and /cwl for CWL\n\nUse /help for commands.\nUse /setting to change language."
+  },
+  "help": {
+    "public": "🤖 <b>War manager help</b>\n\n<b>Commands</b>\n/war — Regular war status\n/cwl — Clan War League status\n/clan — Clan info\n/help — This help\n/setting — Language settings\n\n<b>Accounts</b>\n/link #TAG — Link a Clash account\n/unlink #TAG — Unlink an account\n/unlinkall — Unlink all your accounts\n/myaccounts — List linked accounts\n\n<b>Note</b>\nDuring CWL use /cwl.\nIf you use /war while in CWL, the bot will guide you.",
+    "owner": "🤖 <b>Bot help — Owner</b>\n\n<b>Public</b>\n/war · /cwl · /clan · /help · /setting\n/link #TAG · /unlink #TAG · /unlinkall · /myaccounts\n\n<b>Link others</b>\n<code>/link TELEGRAM_USER_ID #TAG</code>\n<code>/unlink TELEGRAM_USER_ID #TAG</code>\n\n<b>Owner tools</b>\n/status — Technical status\n/testnotify — Test group notify\n/testlog — Test log channel\n/testw — Widget preview\n\n<b>Note</b>\nWar/CWL notifications go to the group automatically."
+  },
+  "link": {
+    "usage": "Usage:\n/link #CLASH_TAG\nor (owner):\n/link TELEGRAM_USER_ID #CLASH_TAG",
+    "owner_only_others": "❌ Only the bot owner can link accounts for others.",
+    "invalid_telegram_id": "❌ Invalid Telegram user id.",
+    "already": "ℹ️ Already linked: {{tag}}{{name}}",
+    "success_self": "✅ Linked {{tag}}{{name}} to your account.",
+    "success_other": "✅ Linked {{tag}}{{name}} to user {{userId}}."
+  },
+  "unlink": {
+    "usage": "Usage:\n/unlink #CLASH_TAG\nor (owner):\n/unlink TELEGRAM_USER_ID #CLASH_TAG",
+    "owner_only_others": "❌ Only the owner can unlink others.",
+    "invalid_telegram_id": "❌ Invalid Telegram user id.",
+    "not_found": "ℹ️ No link found for {{tag}}.",
+    "success": "✅ Unlinked {{tag}}."
+  },
+  "unlinkall": {
+    "confirm_prompt": "⚠️ Unlink ALL of your linked accounts?\nThis cannot be undone.",
+    "confirm_btn": "Confirm delete",
+    "cancel_btn": "Cancel",
+    "none": "ℹ️ You had no linked accounts.",
+    "success": "✅ All your links were removed:\n{{list}}",
+    "cancelled": "❎ Unlink-all cancelled.",
+    "not_yours": "This button is not for you."
+  },
+  "myaccounts": {
+    "empty": "ℹ️ You have no linked accounts.\nUse /link #TAG to link one.",
+    "title": "🎮 Your linked accounts:\n{{list}}"
+  },
+  "war": {
+    "not_in_war": "The clan is not in war right now.",
+    "use_cwl": "The clan is in Clan War League (CWL).\nUse /cwl instead.",
+    "title": "⚔️ War status",
+    "enemy_title": "⚡ Enemy team",
+    "attacks_line": "⚔️ Attacks: <b>{{used}}/{{max}}</b>",
+    "start_time": "🕐 Battle starts: <b>{{time}}</b>",
+    "end_time": "🕐 War ends: <b>{{time}}</b>",
+    "team_size": "👥 {{size}}v{{size}}",
+    "state_line": "⏳ Status: <b>{{state}}</b>",
+    "members_heading": "📋 War members",
+    "enemy_heading": "📋 Enemy members",
+    "enemy_missing": "Enemy roster is not available.",
+    "btn_enemy": "👁 Enemy",
+    "btn_back": "↩️ Back",
+    "btn_standings": "🏆 Standings",
+    "rich_unsupported": "⚠️ Your Telegram client does not support Rich Messages.\nPlease update Telegram.",
+    "fetch_error": "❌ Failed to fetch war info: {{message}}"
+  },
+  "cwl": {
+    "not_in_cwl": "The clan is not in CWL right now.\nUse /war for regular wars.",
+    "title": "⚔️ War status",
+    "standings_title": "🏆 CWL standings",
+    "standings_empty": "Standings are not available.",
+    "season": "📅 Season: <b>{{season}}</b>",
+    "standings_note": "Ranked by stars (including +10 win bonus), then destruction.",
+    "standings_cache": "Cached up to ~10 minutes to reduce API load.",
+    "day_label": "Day {{day}} of {{total}}",
+    "day_line": "📅 <b>{{dayLabel}}</b> Clan War League"
+  },
+  "clan": {
+    "fetch_error": "❌ Failed to fetch clan info: {{message}}",
+    "title_status": "📊 Clan status",
+    "title_war": "⚔️ War & league",
+    "col_item": "Item",
+    "col_value": "Value",
+    "members": "👥 Members",
+    "level": "🏆 Level",
+    "points": "⭐ Points",
+    "builder": "🔨 Builder base",
+    "capital": "🏛 Capital",
+    "capital_league": "🏛 Capital league",
+    "type": "🔐 Type",
+    "location": "📍 Location",
+    "min_th": "🏠 Min TH",
+    "min_trophies": "🎯 Min trophies",
+    "war_league": "🛡️ War league",
+    "war_frequency": "📅 War frequency",
+    "war_streak": "🔥 Win streak",
+    "wins": "✅ Wins",
+    "losses": "❌ Losses",
+    "ties": "🤝 Ties",
+    "war_log": "📜 War log",
+    "log_public": "Public",
+    "log_private": "Private",
+    "type_open": "Open",
+    "type_invite": "Invite only",
+    "type_closed": "Closed",
+    "freq_always": "Always",
+    "freq_moreThanOncePerWeek": "More than once a week",
+    "freq_oncePerWeek": "Once a week",
+    "freq_lessThanOncePerWeek": "Less than once a week",
+    "freq_never": "Never",
+    "freq_unknown": "Unknown",
+    "unknown": "Unknown"
+  },
+  "state": {
+    "notInWar": "Not in war",
+    "preparation": "Preparation",
+    "inWar": "In battle",
+    "warEnded": "Ended",
+    "unknown": "Unknown"
+  },
+  "result": {
+    "win": "🏆 Win",
+    "lose": "❌ Loss",
+    "tie": "🤝 Draw"
+  },
+  "time": {
+    "today": "Today at {{time}}",
+    "tomorrow": "Tomorrow at {{time}}",
+    "weekday": "{{weekday}} at {{time}}"
+  },
+  "notify": {
+    "prep_title": "⚔️ Opponent found — preparation started!",
+    "cwl_league_start": "🏟 CWL started — day 1 preparation",
+    "battle_start": "🔥 Battle day started!",
+    "battle_start_cwl": "🔥 Battle day started! (CWL)",
+    "one_hour": "⏰ 1 hour left in war",
+    "one_hour_cwl": "⏰ 1 hour left in war (CWL)",
+    "war_ended": "🏁 War has ended!",
+    "war_ended_cwl": "🏁 War has ended! (CWL)",
+    "offline_note": "Bot was offline at end time; result from last saved state:",
+    "result_line": "Result: <b>{{result}}</b>",
+    "pending_all_done": "✅ Everyone has used their attacks.",
+    "pending_all_stars": "✅ All stars have been taken.",
+    "pending_count": "⚠️ Attacks remaining: <b>{{count}}</b> player(s)",
+    "pending_footer": "Don't forget your attacks.",
+    "mentions": "📣 Mentions: {{list}}",
+    "fallback_plain": "War notice (client does not support Rich Message)",
+    "league_ended_title": "🏁 Clan War League has ended!",
+    "league_final": "🏟 Final group results",
+    "league_rank": "🏅 Our rank: <b>{{rank}} of {{total}}</b><br/>⭐ Total stars: <b>{{stars}}</b><br/>🏆 Wins: <b>{{wins}}</b>",
+    "thanks_all": "💚 Thanks to the whole clan for this season.",
+    "thanks_special": "⭐ Special thanks to those with at least <b>{{min}}</b> stars:<br/>{{list}}",
+    "thanks_rest": "💚 And thanks to everyone else who took part.",
+    "thanks_unlinked": "⭐ Some players reached {{min}}+ stars; link accounts to be mentioned.",
+    "good_job": "Well done 💪"
+  },
+  "rate": {
+    "war": "⏳ Too many /war requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
+    "cwl": "⏳ Too many /cwl requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
+    "clan": "⏳ Too many /clan requests.\nPlease try again in about <b>{{sec}}</b> seconds."
+  },
+  "loading": {
+    "default": "⏳ Loading...",
+    "war": "⏳ Loading war status...",
+    "cwl": "⏳ Loading CWL status...",
+    "clan": "⏳ Loading clan info..."
+  },
+  "link_errors": {
+    "invalid_tag": "Invalid Clash tag. Example: #ABC123XYZ",
+    "not_found": "No Clash account found with this tag."
+  }
+}
