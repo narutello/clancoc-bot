@@ -3,36 +3,26 @@ const { tgLog } = require('../utils/telegramLogger');
 
 module.exports = async function testLogCommand(ctx) {
   const fromId = ctx.from?.id;
+  const t = ctx.t.bind(ctx);
+
   if (!fromId || String(fromId) !== String(config.ownerTelegramId)) {
-    return ctx.reply('⛔ این دستور فقط برای اونر ربات است.');
+    return ctx.reply(t('test.owner_only'));
   }
 
   if (!config.logTelegramId) {
-    return ctx.reply(
-      '❌ متغیر LOG_TELEGRAM_ID تنظیم نشده است.\nآن را در Environment Variables ست کنید و Redeploy کنید.'
-    );
+    return ctx.reply(t('test.no_log'));
   }
 
   try {
-    await ctx.telegram.sendMessage(
-      config.logTelegramId,
-      '✅ Log channel test\nIf you see this, LOG_TELEGRAM_ID is correct.\n🤖 ClanCoC Bot — Log Test OK',
-      { disable_web_page_preview: true }
-    );
-
-    await tgLog.info(
-      'Manual log channel test OK',
-      { from: ctx.from?.id },
-      { module: 'TestLog' }
-    );
-
-    return ctx.reply(
-      `✅ پیام تست به کانال لاگ ارسال شد.\nLog ID: <code>${config.logTelegramId}</code>`,
-      { parse_mode: 'HTML' }
-    );
+    const ok = await tgLog.info('Manual log channel test', {
+      from: fromId,
+      chat: ctx.chat?.id,
+    }, { module: 'TestLog' });
+    if (ok === false) {
+      return ctx.reply(t('test.log_fail', { message: 'not delivered' }));
+    }
+    return ctx.reply(t('test.log_ok'));
   } catch (err) {
-    console.error('[/testlog]', err.message);
-    await tgLog.error('Manual log test failed', err.message, { module: 'TestLog' });
-    return ctx.reply(`❌ خطا در ارسال به کانال لاگ:\n${err.message}`);
+    return ctx.reply(t('test.log_fail', { message: err.message }));
   }
 };

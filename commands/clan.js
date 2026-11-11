@@ -3,38 +3,40 @@ const { escapeHtml, formatTag, stripEmojis } = require('../utils/helpers');
 const config = require('../config');
 const { checkCommandLimit } = require('../utils/commandRateLimit');
 const { withTelegramRetry } = require('../utils/telegramSafe');
+const { isRtl } = require('../utils/i18n');
 const {
   sendLoading,
   deleteLoading,
   replaceLoadingText,
 } = require('../utils/loading');
 
-function typeLabel(type) {
+function typeLabel(type, t) {
   switch (type) {
     case 'open':
-      return 'باز';
+      return t('clan.type_open');
     case 'inviteOnly':
-      return 'فقط با دعوت';
+      return t('clan.type_invite');
     case 'closed':
-      return 'بسته';
+      return t('clan.type_closed');
     default:
       return type || '—';
   }
 }
 
-function warFrequencyLabel(freq) {
+function warFrequencyLabel(freq, t) {
   switch (freq) {
     case 'always':
-      return 'همیشه';
+      return t('clan.freq_always');
     case 'moreThanOncePerWeek':
-      return 'بیش از هفته‌ای یک‌بار';
+      return t('clan.freq_moreThanOncePerWeek');
     case 'oncePerWeek':
-      return 'هفته‌ای یک‌بار';
+      return t('clan.freq_oncePerWeek');
     case 'lessThanOncePerWeek':
-      return 'کمتر از هفته‌ای یک‌بار';
+      return t('clan.freq_lessThanOncePerWeek');
     case 'never':
+      return t('clan.freq_never');
     case 'unknown':
-      return 'نامشخص';
+      return t('clan.freq_unknown');
     default:
       return freq || '—';
   }
@@ -51,6 +53,9 @@ function row(label, value) {
 
 module.exports = async function clanCommand(ctx) {
   let loadingMsg = null;
+  const lang = ctx.lang || 'fa';
+  const t = ctx.t.bind(ctx);
+
   try {
     const userId = ctx.from?.id;
     const isOwner =
@@ -61,13 +66,12 @@ module.exports = async function clanCommand(ctx) {
       isOwner,
     });
     if (!limit.allowed) {
-      return ctx.reply(
-        `⏳ تعداد درخواست‌های /clan زیاد است.\nلطفاً حدود <b>${limit.retryAfterSec}</b> ثانیه دیگر تلاش کنید.`,
-        { parse_mode: 'HTML' }
-      );
+      return ctx.reply(t('rate.clan', { sec: limit.retryAfterSec }), {
+        parse_mode: 'HTML',
+      });
     }
 
-    loadingMsg = await sendLoading(ctx, '⏳ در حال دریافت اطلاعات کلن...');
+    loadingMsg = await sendLoading(ctx, t('loading.clan'));
 
     const clan = await getClan();
 
@@ -77,7 +81,8 @@ module.exports = async function clanCommand(ctx) {
     const members = clan.members ?? '—';
     const level = clan.clanLevel ?? '—';
     const points = clan.clanPoints ?? '—';
-    const builderPoints = clan.clanBuilderBasePoints ?? clan.clanVersusPoints ?? null;
+    const builderPoints =
+      clan.clanBuilderBasePoints ?? clan.clanVersusPoints ?? null;
     const capitalPoints = clan.clanCapitalPoints ?? null;
 
     const warWins = clan.warWins ?? 0;
@@ -88,7 +93,10 @@ module.exports = async function clanCommand(ctx) {
     const capitalLeague = clan.capitalLeague?.name || null;
 
     const location = clan.location?.name || '—';
-    const isPublicLog = clan.isWarLogPublic === true ? 'عمومی' : 'خصوصی';
+    const isPublicLog =
+      clan.isWarLogPublic === true
+        ? t('clan.log_public')
+        : t('clan.log_private');
     const requiredTh = clan.requiredTownhallLevel ?? '—';
     const requiredTrophies = clan.requiredTrophies ?? '—';
 
@@ -98,7 +106,7 @@ module.exports = async function clanCommand(ctx) {
       .slice(0, 5);
     const labelsLine =
       labels.length > 0
-        ? `<p>🏷 ${labels.map((l) => escapeHtml(l)).join(' · ')}</p>`
+        ? `<p>🏷 ${labels.map((x) => escapeHtml(x)).join(' · ')}</p>`
         : '';
 
     const descBlock = description
@@ -107,13 +115,19 @@ module.exports = async function clanCommand(ctx) {
 
     const extraRows = [];
     if (builderPoints != null) {
-      extraRows.push(row('🔨 بیلدر بیس', escapeHtml(String(builderPoints))));
+      extraRows.push(
+        row(t('clan.builder'), escapeHtml(String(builderPoints)))
+      );
     }
     if (capitalPoints != null) {
-      extraRows.push(row('🏛 پایتخت', escapeHtml(String(capitalPoints))));
+      extraRows.push(
+        row(t('clan.capital'), escapeHtml(String(capitalPoints)))
+      );
     }
     if (capitalLeague) {
-      extraRows.push(row('🏛 لیگ پایتخت', escapeHtml(capitalLeague)));
+      extraRows.push(
+        row(t('clan.capital_league'), escapeHtml(capitalLeague))
+      );
     }
 
     const html = `
@@ -122,35 +136,38 @@ module.exports = async function clanCommand(ctx) {
       ${descBlock}
       ${labelsLine}
 
-      <h3>📊 وضعیت کلن</h3>
+      <h3>${t('clan.title_status')}</h3>
       <table bordered striped compact>
         <tr>
-          <th>مورد</th>
-          <th>مقدار</th>
+          <th>${t('clan.col_item')}</th>
+          <th>${t('clan.col_value')}</th>
         </tr>
-        ${row('👥 اعضا', escapeHtml(String(members)))}
-        ${row('🏆 سطح', escapeHtml(String(level)))}
-        ${row('⭐ امتیاز', escapeHtml(String(points)))}
+        ${row(t('clan.members'), escapeHtml(String(members)))}
+        ${row(t('clan.level'), escapeHtml(String(level)))}
+        ${row(t('clan.points'), escapeHtml(String(points)))}
         ${extraRows.join('')}
-        ${row('🔐 عضویت', escapeHtml(typeLabel(clan.type)))}
-        ${row('📍 مکان', escapeHtml(location))}
-        ${row('🏠 حداقل TH', escapeHtml(String(requiredTh)))}
-        ${row('🎯 حداقل کاپ', escapeHtml(String(requiredTrophies)))}
+        ${row(t('clan.type'), escapeHtml(typeLabel(clan.type, t)))}
+        ${row(t('clan.location'), escapeHtml(location))}
+        ${row(t('clan.min_th'), escapeHtml(String(requiredTh)))}
+        ${row(t('clan.min_trophies'), escapeHtml(String(requiredTrophies)))}
       </table>
 
-      <h3>⚔️ جنگ و لیگ</h3>
+      <h3>${t('clan.title_war')}</h3>
       <table bordered striped compact>
         <tr>
-          <th>مورد</th>
-          <th>مقدار</th>
+          <th>${t('clan.col_item')}</th>
+          <th>${t('clan.col_value')}</th>
         </tr>
-        ${row('🛡️ لیگ وار', escapeHtml(warLeague))}
-        ${row('📅 تناوب وار', escapeHtml(warFrequencyLabel(clan.warFrequency)))}
-        ${row('🔥 وین‌استریک', escapeHtml(String(warStreak)))}
-        ${row('✅ برد', escapeHtml(String(warWins)))}
-        ${row('❌ باخت', escapeHtml(String(warLosses)))}
-        ${row('🤝 مساوی', escapeHtml(String(warTies)))}
-        ${row('📜 وار لاگ', escapeHtml(isPublicLog))}
+        ${row(t('clan.war_league'), escapeHtml(warLeague))}
+        ${row(
+          t('clan.war_frequency'),
+          escapeHtml(warFrequencyLabel(clan.warFrequency, t))
+        )}
+        ${row(t('clan.war_streak'), escapeHtml(String(warStreak)))}
+        ${row(t('clan.wins'), escapeHtml(String(warWins)))}
+        ${row(t('clan.losses'), escapeHtml(String(warLosses)))}
+        ${row(t('clan.ties'), escapeHtml(String(warTies)))}
+        ${row(t('clan.war_log'), escapeHtml(isPublicLog))}
       </table>
     `.trim();
 
@@ -164,7 +181,7 @@ module.exports = async function clanCommand(ctx) {
             chat_id: ctx.chat.id,
             rich_message: {
               html,
-              is_rtl: true,
+              is_rtl: isRtl(lang),
             },
           }),
         { maxRetries: config.telegramMaxRetries }
@@ -174,15 +191,15 @@ module.exports = async function clanCommand(ctx) {
       const fallback = `
 🏰 <b>${escapeHtml(name)}</b> <code>${escapeHtml(tag)}</code>
 
-${description ? `📝 ${escapeHtml(description)}\n` : ''}👥 اعضا: <b>${members}</b>
-🏆 سطح: <b>${level}</b> | ⭐ امتیاز: <b>${points}</b>
-🔐 ${escapeHtml(typeLabel(clan.type))} | 📍 ${escapeHtml(location)}
+${description ? `📝 ${escapeHtml(description)}\n` : ''}${t('clan.members')}: <b>${members}</b>
+${t('clan.level')}: <b>${level}</b> | ${t('clan.points')}: <b>${points}</b>
+${escapeHtml(typeLabel(clan.type, t))} | ${escapeHtml(location)}
 
-⚔️ لیگ وار: <b>${escapeHtml(warLeague)}</b>
-🔥 استریک: <b>${warStreak}</b>
-✅ ${warWins} | ❌ ${warLosses} | 🤝 ${warTies}
-📜 وار لاگ: ${escapeHtml(isPublicLog)}
-🏠 حداقل TH: ${requiredTh} | 🎯 کاپ: ${requiredTrophies}
+${t('clan.war_league')}: <b>${escapeHtml(warLeague)}</b>
+${t('clan.war_streak')}: <b>${warStreak}</b>
+${t('clan.wins')} ${warWins} | ${t('clan.losses')} ${warLosses} | ${t('clan.ties')} ${warTies}
+${t('clan.war_log')}: ${escapeHtml(isPublicLog)}
+${t('clan.min_th')}: ${requiredTh} | ${t('clan.min_trophies')}: ${requiredTrophies}
 `.trim();
       return ctx.reply(fallback, { parse_mode: 'HTML' });
     }
@@ -191,7 +208,7 @@ ${description ? `📝 ${escapeHtml(description)}\n` : ''}👥 اعضا: <b>${mem
     return replaceLoadingText(
       ctx,
       loadingMsg,
-      `❌ خطا در دریافت اطلاعات کلن: ${err.message}`
+      t('clan.fetch_error', { message: err.message })
     );
   }
 };

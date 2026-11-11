@@ -2,6 +2,12 @@ const { query } = require('../database');
 const { getPlayer } = require('../api/clash');
 const { normalizeTag, isValidTag, formatTag } = require('../utils/helpers');
 
+function codedError(code, fallback) {
+  const err = new Error(fallback);
+  err.code = code;
+  return err;
+}
+
 async function upsertTelegramUser(user) {
   await query(
     `INSERT INTO telegram_users (telegram_id, username, first_name, last_name, updated_at)
@@ -31,7 +37,7 @@ async function upsertClashAccount(tag, name) {
 async function linkAccount(telegramId, clashTag, fetchName = true) {
   const clean = normalizeTag(clashTag);
   if (!isValidTag(clean)) {
-    throw new Error('تگ کلش نامعتبر است. مثال صحیح: #ABC123XYZ');
+    throw codedError('link_errors.invalid_tag', 'Invalid Clash tag');
   }
 
   let name = null;
@@ -41,7 +47,7 @@ async function linkAccount(telegramId, clashTag, fetchName = true) {
       name = player.name;
     } catch (err) {
       if (err.isNotFound) {
-        throw new Error('اکانت کلش با این تگ پیدا نشد.');
+        throw codedError('link_errors.not_found', 'Clash account not found');
       }
       console.warn('[Link] Could not fetch player name:', err.message);
     }
