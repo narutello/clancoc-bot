@@ -55,14 +55,23 @@ function isOwnerUser(userId) {
   return Number(userId) === ownerId;
 }
 
+async function sendDmHelp(telegram, userId, text) {
+  await withTelegramRetry(
+    () =>
+      telegram.sendMessage(userId, text, {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }),
+    { maxRetries: config.telegramMaxRetries }
+  );
+}
+
 module.exports = async function helpCommand(ctx) {
   const userId = ctx.from?.id;
   const isOwner = isOwnerUser(userId);
   const isPrivate = !ctx.chat?.type || ctx.chat.type === 'private';
-  const publicText = publicHelpText();
-  const ownerText = ownerHelpText();
+  const text = isOwner ? ownerHelpText() : publicHelpText();
 
-  // Log who requested help (helps audit mistaken owner matches)
   try {
     await tgLog.info(
       `/help by ${userId}${isOwner ? ' (owner)' : ''}`,
@@ -75,62 +84,65 @@ module.exports = async function helpCommand(ctx) {
     );
   } catch (_) {}
 
-  // Private chat: owner gets full help, others get public
+  // PV: normal message
   if (isPrivate) {
-    const text = isOwner ? ownerText : publicText;
     return ctx.reply(text, {
       parse_mode: 'HTML',
       disable_web_page_preview: true,
     });
   }
 
-  // Group/supergroup:
-  // - Prefer ephemeral so only the caller sees it
-  // - Owner text ONLY via ephemeral (or DM). Never post owner tools publicly.
-  const textForCaller = isOwner ? ownerText : publicText;
+  if (!userId) {
+    return ctx.reply(publicHelpText(), {
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    });
+  }
 
+  // Group: 1) try ephemeral (works reliably if bot is admin)
+  // Docs: non-admin bots need callback/ephemeral context; admin can use receiver_user_id.
   try {
     await withTelegramRetry(
       () =>
         ctx.telegram.callApi('sendMessage', {
           chat_id: ctx.chat.id,
-          text: textForCaller,
+          text,
           parse_mode: 'HTML',
           disable_web_page_preview: true,
           ephemeral_message_parameters: {
             receiver_user_id: userId,
           },
         }),
-      { maxRetries: config.telegramMaxRetries }
+      { maxRetries: 1 }
     );
     return;
   } catch (err) {
-    console.warn('[/help] ephemeral send failed:', err.message);
-  }
-
-  // Fallback: public message must stay public-safe
-  try {
-    await ctx.reply(publicText, {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    });
-  } catch (e) {
-    console.warn('[/help] public fallback failed:', e.message);
-  }
-
-  // If owner and ephemeral failed, try DM with full owner help
-  if (isOwner && userId) {
+    console.warn('[/help] ephemeral failed:', err.description || err.message);
     try {
-      await withTelegramRetry(
-        () =>
-          ctx.telegram.sendMessage(userId, ownerText, {
-            parse_mode: 'HTML',
-            disable_web_page_preview: true,
-          }),
-        { maxRetries: config.telegramMaxRetries }
+      await tgLog.warn(
+        'Ephemeral /help failed; falling back to DM',
+        err.description || err.message,
+        { module: 'Help' }
       );
-    } catch (e) {
-      console.warn('[/help] owner DM failed:', e.message);
-    }
+    } catch (_) {}
   }
+
+  // 2) Fallback: DM only — do NOT post help publicly in the group
+  try {
+    await sendDmHelp(ctx.telegram, userId, text);
+    try {
+      await ctx.reply('📩 راهنما براتون توی پیوی ربات ارسال شد.', {
+        disable_notification: true,
+      });
+    } catch (_) {}
+    return;
+  } catch (err) {
+    console.warn('[/help] DM failed:', err.description || err.message);
+  }
+
+  // 3) Last resort: public message, but only public (non-owner) text
+  return ctx.reply(publicHelpText(), {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  });
 };
