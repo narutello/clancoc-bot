@@ -20,16 +20,6 @@ const {
   richMessageErrorReply,
 } = require('./warView');
 
-async function fetchCwlWar() {
-  try {
-    const found = await findOurCwlWar();
-    if (found && found.war) return found;
-  } catch (err) {
-    if (!err.isNotFound) throw err;
-  }
-  return null;
-}
-
 async function resolveCwlWar() {
   const cacheKey = `cwlWar:${config.clanTag}`;
   const cached = getCache(cacheKey);
@@ -38,14 +28,26 @@ async function resolveCwlWar() {
   return singleflight(cacheKey, async () => {
     const again = getCache(cacheKey);
     if (again !== null) return again;
-    const result = await fetchCwlWar();
-    setCache(cacheKey, result, config.warCacheTtlMs);
-    return result;
+    const found = await findOurCwlWar();
+    if (!found || !found.war) {
+      setCache(cacheKey, null, config.warCacheTtlMs);
+      return null;
+    }
+    const resolved = {
+      war: found.war,
+      isCwl: true,
+      cwlDay: found.cwlDay,
+      cwlTotalDays: found.cwlTotalDays,
+      cwlSeason: found.cwlSeason,
+    };
+    setCache(cacheKey, resolved, config.warCacheTtlMs);
+    return resolved;
   });
 }
 
 async function cwlCommand(ctx) {
   let loadingMsg = null;
+  const lang = ctx.lang || 'fa';
   try {
     const userId = ctx.from?.id;
     const isOwner =
@@ -56,107 +58,74 @@ async function cwlCommand(ctx) {
       isOwner,
     });
     if (!limit.allowed) {
-      return ctx.reply(
-        `⏳ تعداد درخواست‌های /cwl زیاد است.\n` +
-          `لطفاً حدود <b>${limit.retryAfterSec}</b> ثانیه دیگر دوباره تلاش کنید.`,
-        { parse_mode: 'HTML' }
-      );
+      return ctx.reply(ctx.t('rate.cwl', { sec: limit.retryAfterSec }), {
+        parse_mode: 'HTML',
+      });
     }
 
-    loadingMsg = await sendLoading(ctx, '⏳ در حال دریافت وضعیت لیگ...');
+    loadingMsg = await sendLoading(ctx, ctx.t('loading.cwl'));
 
     const resolved = await resolveCwlWar();
     if (!resolved || !resolved.war) {
-      return replaceLoadingText(
-        ctx,
-        loadingMsg,
-        'در حال حاضر کلن در لیگ کلن‌ها (CWL) نیست.'
-      );
+      return replaceLoadingText(ctx, loadingMsg, ctx.t('cwl.not_in_cwl'));
     }
 
-    const html = await buildOurHtml(resolved, '🏟 وضعیت لیگ کلن‌ها');
+    const html = await buildOurHtml(resolved, ctx.t('cwl.title'), lang);
     await deleteLoading(ctx, loadingMsg);
     loadingMsg = null;
-    return sendRich(ctx, html, keyboardOur('cwl'));
+    return sendRich(ctx, html, keyboardOur('cwl', lang), lang);
   } catch (err) {
     console.error('[/cwl]', err.message);
-    await deleteLoading(ctx, loadingMsg);
     return richMessageErrorReply(
       ctx,
       err,
-      `❌ خطا در دریافت اطلاعات CWL: ${err.message}`
+      ctx.t('war.fetch_error', { message: err.message })
     );
   }
 }
 
 async function cwlEnemyAction(ctx) {
+  const lang = ctx.lang || 'fa';
   try {
-    await ctx.answerCbQuery('⏳ در حال بارگذاری...');
+    await ctx.answerCbQuery();
     const resolved = await resolveCwlWar();
     if (!resolved || !resolved.war) {
-      return ctx.answerCbQuery('در حال حاضر کلن در CWL نیست.', {
-        show_alert: true,
-      });
+      return ctx.reply(ctx.t('cwl.not_in_cwl'));
     }
-    const html = await buildEnemyHtml(resolved, '⚡ تیم حریف (CWL)');
-    return editRich(ctx, html, keyboardEnemy('cwl'));
+    const html = await buildEnemyHtml(resolved, ctx.t('war.enemy_title'), lang);
+    return editRich(ctx, html, keyboardEnemy('cwl', lang), lang);
   } catch (err) {
     console.error('[cwl:enemy]', err.message);
-    try {
-      await ctx.answerCbQuery('خطا در دریافت اطلاعات حریف', { show_alert: true });
-    } catch (_) {}
+    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
   }
 }
 
 async function cwlHomeAction(ctx) {
+  const lang = ctx.lang || 'fa';
   try {
-    await ctx.answerCbQuery('⏳ در حال بارگذاری...');
+    await ctx.answerCbQuery();
     const resolved = await resolveCwlWar();
     if (!resolved || !resolved.war) {
-      return ctx.answerCbQuery('در حال حاضر کلن در CWL نیست.', {
-        show_alert: true,
-      });
+      return ctx.reply(ctx.t('cwl.not_in_cwl'));
     }
-    const html = await buildOurHtml(resolved, '🏟 وضعیت لیگ کلن‌ها');
-    return editRich(ctx, html, keyboardOur('cwl'));
+    const html = await buildOurHtml(resolved, ctx.t('cwl.title'), lang);
+    return editRich(ctx, html, keyboardOur('cwl', lang), lang);
   } catch (err) {
     console.error('[cwl:home]', err.message);
-    try {
-      await ctx.answerCbQuery('خطا در بازگشت', { show_alert: true });
-    } catch (_) {}
+    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
   }
 }
 
 async function cwlStandingsAction(ctx) {
+  const lang = ctx.lang || 'fa';
   try {
-    const userId = ctx.from?.id;
-    const isOwner =
-      userId != null && Number(userId) === Number(config.ownerTelegramId);
-    const limit = checkCommandLimit(userId, 'cwl_standings', {
-      limit: config.cwlCmdLimit,
-      windowMs: config.cwlCmdWindowMs,
-      isOwner,
-    });
-    if (!limit.allowed) {
-      return ctx.answerCbQuery(
-        `درخواست زیاد است. حدود ${limit.retryAfterSec} ثانیه صبر کنید.`,
-        { show_alert: true }
-      );
-    }
-
-    await ctx.answerCbQuery('⏳ در حال ساخت جدول لیگ...');
+    await ctx.answerCbQuery();
     const data = await getCwlStandings();
-    if (!data || !data.standings || !data.standings.length) {
-      return ctx.answerCbQuery('جدول لیگ در دسترس نیست.', { show_alert: true });
-    }
-
-    const html = buildStandingsHtml(data);
-    return editRich(ctx, html, keyboardStandings());
+    const html = buildStandingsHtml(data, lang);
+    return editRich(ctx, html, keyboardStandings(lang), lang);
   } catch (err) {
     console.error('[cwl:standings]', err.message);
-    try {
-      await ctx.answerCbQuery('خطا در دریافت جدول لیگ', { show_alert: true });
-    } catch (_) {}
+    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
   }
 }
 
@@ -164,4 +133,3 @@ module.exports = cwlCommand;
 module.exports.cwlEnemyAction = cwlEnemyAction;
 module.exports.cwlHomeAction = cwlHomeAction;
 module.exports.cwlStandingsAction = cwlStandingsAction;
-module.exports.resolveCwlWar = resolveCwlWar;

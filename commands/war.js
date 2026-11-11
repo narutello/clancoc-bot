@@ -47,6 +47,7 @@ async function resolveRegularWar() {
 
 async function warCommand(ctx) {
   let loadingMsg = null;
+  const lang = ctx.lang || 'fa';
   try {
     const userId = ctx.from?.id;
     const isOwner =
@@ -58,87 +59,70 @@ async function warCommand(ctx) {
     });
     if (!limit.allowed) {
       return ctx.reply(
-        `⏳ تعداد درخواست‌های /war زیاد است.\n` +
-          `لطفاً حدود <b>${limit.retryAfterSec}</b> ثانیه دیگر دوباره تلاش کنید.`,
+        ctx.t('rate.war', { sec: limit.retryAfterSec }),
         { parse_mode: 'HTML' }
       );
     }
 
-    loadingMsg = await sendLoading(ctx, '⏳ در حال دریافت وضعیت وار...');
+    loadingMsg = await sendLoading(ctx, ctx.t('loading.war'));
 
     const resolved = await resolveRegularWar();
     if (resolved && resolved.war) {
-      const html = await buildOurHtml(resolved, '⚔️ وضعیت وار');
+      const html = await buildOurHtml(resolved, ctx.t('war.title'), lang);
       await deleteLoading(ctx, loadingMsg);
       loadingMsg = null;
-      return sendRich(ctx, html, keyboardOur('war'));
+      return sendRich(ctx, html, keyboardOur('war', lang), lang);
     }
 
     if (await isInCwl()) {
-      return replaceLoadingText(
-        ctx,
-        loadingMsg,
-        '🏟 کلن الان در <b>لیگ کلن‌ها (CWL)</b> است.\n' +
-          'برای وضعیت لیگ از دستور /cwl استفاده کنید.',
-        { parse_mode: 'HTML' }
-      );
+      return replaceLoadingText(ctx, loadingMsg, ctx.t('war.use_cwl'), {
+        parse_mode: 'HTML',
+      });
     }
 
-    return replaceLoadingText(
-      ctx,
-      loadingMsg,
-      'در حال حاضر کلن در وار نیست.'
-    );
+    return replaceLoadingText(ctx, loadingMsg, ctx.t('war.not_in_war'));
   } catch (err) {
     console.error('[/war]', err.message);
-    await deleteLoading(ctx, loadingMsg);
     return richMessageErrorReply(
       ctx,
       err,
-      `❌ خطا در دریافت اطلاعات وار: ${err.message}`
+      ctx.t('war.fetch_error', { message: err.message })
     );
   }
 }
 
 async function warEnemyAction(ctx) {
+  const lang = ctx.lang || 'fa';
   try {
-    await ctx.answerCbQuery('⏳ در حال بارگذاری...');
+    await ctx.answerCbQuery();
     const resolved = await resolveRegularWar();
     if (!resolved || !resolved.war) {
-      return ctx.answerCbQuery('در حال حاضر کلن در وار معمولی نیست.', {
-        show_alert: true,
-      });
+      return ctx.reply(ctx.t('war.not_in_war'));
     }
-    const html = await buildEnemyHtml(resolved, '⚡ تیم حریف');
-    return editRich(ctx, html, keyboardEnemy('war'));
+    const html = await buildEnemyHtml(resolved, ctx.t('war.enemy_title'), lang);
+    return editRich(ctx, html, keyboardEnemy('war', lang), lang);
   } catch (err) {
     console.error('[war:enemy]', err.message);
-    try {
-      await ctx.answerCbQuery('خطا در دریافت اطلاعات حریف', { show_alert: true });
-    } catch (_) {}
+    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
   }
 }
 
 async function warHomeAction(ctx) {
+  const lang = ctx.lang || 'fa';
   try {
-    await ctx.answerCbQuery('⏳ در حال بارگذاری...');
+    await ctx.answerCbQuery();
     const resolved = await resolveRegularWar();
     if (!resolved || !resolved.war) {
-      return ctx.answerCbQuery('در حال حاضر کلن در وار معمولی نیست.', {
-        show_alert: true,
-      });
+      return ctx.reply(ctx.t('war.not_in_war'));
     }
-    const html = await buildOurHtml(resolved, '⚔️ وضعیت وار');
-    return editRich(ctx, html, keyboardOur('war'));
+    const html = await buildOurHtml(resolved, ctx.t('war.title'), lang);
+    return editRich(ctx, html, keyboardOur('war', lang), lang);
   } catch (err) {
     console.error('[war:home]', err.message);
-    try {
-      await ctx.answerCbQuery('خطا در بازگشت', { show_alert: true });
-    } catch (_) {}
+    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
   }
 }
 
 module.exports = warCommand;
 module.exports.warEnemyAction = warEnemyAction;
 module.exports.warHomeAction = warHomeAction;
-module.exports.resolveRegularWar = resolveRegularWar;

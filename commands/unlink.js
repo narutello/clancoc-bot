@@ -1,6 +1,6 @@
 const config = require('../config');
 const { unlinkAccount, upsertTelegramUser } = require('../services/linkService');
-const { formatTag, normalizeTag } = require('../utils/helpers');
+const { formatTag } = require('../utils/helpers');
 
 module.exports = async function unlinkCommand(ctx) {
   const from = ctx.from;
@@ -16,33 +16,26 @@ module.exports = async function unlinkCommand(ctx) {
     tagArg = args[0];
   } else if (args.length >= 2) {
     if (!isOwner) {
-      return ctx.reply('❌ فقط اونر ربات می‌تواند لینک دیگران را حذف کند.');
+      return ctx.reply(ctx.t('unlink.owner_only_others'));
     }
     const possibleId = Number(args[0]);
     if (Number.isNaN(possibleId) || possibleId <= 0) {
-      return ctx.reply('❌ شناسه تلگرام نامعتبر است.');
+      return ctx.reply(ctx.t('unlink.invalid_telegram_id'));
     }
     targetTelegramId = possibleId;
     tagArg = args[1];
   } else {
-    return ctx.reply(
-      'استفاده:\n/unlink #CLASH_TAG\nیا (اونر):\n/unlink TELEGRAM_USER_ID #CLASH_TAG'
-    );
+    return ctx.reply(ctx.t('unlink.usage'));
   }
 
   try {
-    const removed = await unlinkAccount(targetTelegramId, tagArg);
-    const tag = formatTag(normalizeTag(tagArg));
-
-    if (!removed) {
-      return ctx.reply(`ℹ️ لینکی برای ${tag} پیدا نشد.`);
+    const ok = await unlinkAccount(targetTelegramId, tagArg);
+    const tag = formatTag(tagArg);
+    if (!ok) {
+      return ctx.reply(ctx.t('unlink.not_found', { tag }));
     }
-
-    if (targetTelegramId === from.id) {
-      return ctx.reply(`✅ لینک ${tag} از حساب شما حذف شد.`);
-    }
-    return ctx.reply(`✅ لینک ${tag} از کاربر ${targetTelegramId} حذف شد.`);
+    return ctx.reply(ctx.t('unlink.success', { tag }));
   } catch (err) {
-    return ctx.reply(`❌ خطا: ${err.message}`);
+    return ctx.reply(ctx.t('common.error', { message: err.message }));
   }
 };
