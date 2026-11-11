@@ -1,13 +1,40 @@
-const fa = require('../locales/fa.json');
-const en = require('../locales/en.json');
+const faBase = require('../locales/fa.json');
+const enBase = require('../locales/en.json');
+
+let faExtra = {};
+let enExtra = {};
+try {
+  faExtra = require('../locales/fa-extra.json');
+} catch (_) {}
+try {
+  enExtra = require('../locales/en-extra.json');
+} catch (_) {}
+
+function mergeDeep(base, extra) {
+  const out = { ...base };
+  for (const [k, v] of Object.entries(extra || {})) {
+    if (
+      v &&
+      typeof v === 'object' &&
+      !Array.isArray(v) &&
+      out[k] &&
+      typeof out[k] === 'object'
+    ) {
+      out[k] = { ...out[k], ...v };
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+const catalogs = {
+  fa: mergeDeep(faBase, faExtra),
+  en: mergeDeep(enBase, enExtra),
+};
 
 const SUPPORTED = ['fa', 'en'];
 const DEFAULT_LANG = 'fa';
-
-const catalogs = {
-  fa,
-  en,
-};
 
 function normalizeLang(code) {
   if (!code) return null;
@@ -43,12 +70,6 @@ function interpolate(str, params) {
   });
 }
 
-/**
- * Translate a key for an explicit language (never mutates global state).
- * @param {string} key
- * @param {object} [options]
- * @param {string} [options.lng]
- */
 function t(key, options = {}) {
   const lng = normalizeLang(options.lng) || DEFAULT_LANG;
   const { lng: _ignored, ...params } = options;
