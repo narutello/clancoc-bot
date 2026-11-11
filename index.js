@@ -2,9 +2,104 @@ const http = require('http');
 const config = require('./config');
 const { createBot } = require('./bot');
 const { migrate } = require('./database/migrate');
-const { startWarMonitor } = require('./services/warMonitor');
+const { startWarMonitor, stopWarMonitor } = require('./services/warMonitor');
 const { pool } = require('./database');
 const { tgLog } = require('./utils/telegramLogger');
+const { getMonitorStats } = require('./services/monitorStats');
+
+const bootAt = Date.now();
+let botReady = false;
+
+async function checkDb() {
+  const start = Date.now();
+  try {
+    await pool.query('SELECT 1');
+    return { ok: true, latencyMs: Date.now() - start };
+  } catch (err) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - start,
+      error: String(err.message || err).slice(0, 200),
+    };
+  }
+}
+
+async function buildHealthPayload() {
+  const mon = getMonitorStats();
+  const db = await checkDb();
+  const uptimeSec = Math.floor((Date.now() - bootAt) / 1000);
+
+  const ok = db.ok && botReady;
+
+  return {
+    ok,
+    service: 'clancoc-bot',
+    time: new Date().toISOString(),
+    uptimeSec,
+    botReady,
+    database: db,
+    monitor: {
+      lastPollAt: mon.lastPollAt
+        ? new Date(mon.lastPollAt).toISOString()
+        : null,
+      lastPollOk: mon.lastPollOk,
+      lastPollError: mon.lastPollError,
+      lastState: mon.lastState,
+      lastOpponent: mon.lastOpponent,
+      isCwl: mon.isCwl,
+      cwlDay: mon.cwlDay,
+      cwlTotalDays: mon.cwlTotalDays,
+      nextPollMs: mon.nextPollMs,
+      nextPollAt: mon.nextPollAt
+        ? new Date(mon.nextPollAt).toISOString()
+        : null,
+      adaptiveReason: mon.adaptiveReason,
+      pollCount: mon.pollCount,
+      errorCount: mon.errorCount,
+    },
+    config: {
+      clanTag: config.clanTag ? `#${config.clanTag}` : null,
+      hasGroup: Boolean(config.telegramGroupId),
+      hasLogChannel: Boolean(config.logTelegramId),
+      pollIdleMs: config.warPollIdleMs,
+      pollActiveMs: config.warPollActiveMs,
+      pollNearMs: config.warPollNearMs,
+    },
+  };
+}
+
+function startHealthServer(port) {
+  const server = http.createServer(async (req, res) => {
+    try {
+      const url = (req.url || '/').split('?')[0];
+      if (req.method === 'GET' && (url === '/' || url === '/health')) {
+        const body = await buildHealthPayload();
+        const code = body.ok ? 200 : 503;
+        res.writeHead(code, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(JSON.stringify(body, null, 2));
+        return;
+      }
+
+      // Hosts sometimes probe arbitrary paths — stay 200 so deploys are not flaky
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('ClanCoC Bot is running');
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(
+        JSON.stringify({ ok: false, error: String(err.message || err) })
+      );
+    }
+  });
+
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`[OK] Health server listening on port ${port}`);
+  });
+
+  return server;
+}
 
 async function main() {
   console.log('========================================');
@@ -28,15 +123,8 @@ async function main() {
     process.exit(1);
   }
 
-  const port = process.env.PORT || 3000;
-  const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('ClanCoC Bot is running');
-  });
-
-  server.listen(port, '0.0.0.0', () => {
-    console.log(`[OK] Health server listening on port ${port}`);
-  });
+  const port = process.env.PORT || process.env.SERVER_PORT || 3000;
+  const server = startHealthServer(port);
 
   const bot = createBot();
   tgLog.setBot(bot);
@@ -44,6 +132,7 @@ async function main() {
   bot
     .launch()
     .then(() => {
+      botReady = true;
       console.log('[OK] Telegram bot started (launch resolved)');
     })
     .catch((err) => {
@@ -57,7 +146,9 @@ async function main() {
     {
       clan: config.clanTag,
       group: config.telegramGroupId,
-      pollMs: config.warPollIntervalMs,
+      pollIdleMs: config.warPollIdleMs,
+      pollActiveMs: config.warPollActiveMs,
+      pollNearMs: config.warPollNearMs,
     },
     { module: 'Boot' }
   );
@@ -66,6 +157,9 @@ async function main() {
   console.log(`[INFO] Group ID: ${config.telegramGroupId || 'not set'}`);
   console.log(`[INFO] Log channel: ${config.logTelegramId || 'not set'}`);
   console.log(`[INFO] API Base: ${config.clashApiBaseUrl}`);
+  console.log(
+    `[INFO] Adaptive poll idle=${config.warPollIdleMs} active=${config.warPollActiveMs} near=${config.warPollNearMs}`
+  );
 
   setTimeout(async () => {
     try {
@@ -81,7 +175,7 @@ async function main() {
   setTimeout(() => {
     try {
       startWarMonitor(bot);
-      console.log('[OK] War monitor started');
+      console.log('[OK] War monitor started (adaptive)');
     } catch (e) {
       console.error('[FAIL] War monitor start:', e.message);
     }
@@ -89,6 +183,9 @@ async function main() {
 
   const stop = async (signal) => {
     console.log(`\nReceived ${signal}, shutting down...`);
+    try {
+      stopWarMonitor();
+    } catch (_) {}
     try {
       await tgLog.warn(`Shutting down (${signal})`, null, { module: 'Boot' });
     } catch (_) {}

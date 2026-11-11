@@ -19,11 +19,23 @@ const config = {
   botToken: requireEnv('BOT_TOKEN'),
   databaseUrl: requireEnv('DATABASE_URL'),
   clashApiToken: requireEnv('CLASH_API_TOKEN'),
-  clashApiBaseUrl: process.env.CLASH_API_BASE_URL || 'https://cocproxy.royaleapi.dev/v1',
+  clashApiBaseUrl:
+    process.env.CLASH_API_BASE_URL || 'https://cocproxy.royaleapi.dev/v1',
   ownerTelegramId: Number(requireEnv('OWNER_TELEGRAM_ID')),
-  telegramGroupId: process.env.TELEGRAM_GROUP_ID ? process.env.TELEGRAM_GROUP_ID.trim() : null,
+  telegramGroupId: process.env.TELEGRAM_GROUP_ID
+    ? process.env.TELEGRAM_GROUP_ID.trim()
+    : null,
   clanTag: (process.env.CLAN_TAG || '').replace(/^#/, '').toUpperCase(),
+
+  // Backward-compatible base interval (also used as "active" default)
   warPollIntervalMs: intEnv('WAR_POLL_INTERVAL_MS', 120000),
+
+  // Adaptive polling
+  warPollIdleMs: intEnv('WAR_POLL_IDLE_MS', 300000), // not in war
+  warPollActiveMs: intEnv('WAR_POLL_ACTIVE_MS', 0), // 0 = use WAR_POLL_INTERVAL_MS
+  warPollNearMs: intEnv('WAR_POLL_NEAR_MS', 30000), // near start / 1h left / end
+  warPollMinMs: intEnv('WAR_POLL_MIN_MS', 20000),
+
   logTelegramId: process.env.LOG_TELEGRAM_ID
     ? process.env.LOG_TELEGRAM_ID.trim().replace(/^["']|["']$/g, '')
     : null,
@@ -37,7 +49,6 @@ const config = {
 
   warCacheTtlMs: intEnv('WAR_CACHE_TTL_MS', 8000),
 
-  // CWL group table: cache hard to protect API (default 10 minutes)
   cwlStandingsCacheTtlMs: intEnv('CWL_STANDINGS_CACHE_TTL_MS', 600000),
   cwlStandingsConcurrency: intEnv('CWL_STANDINGS_CONCURRENCY', 3),
 
@@ -52,6 +63,10 @@ if (!config.clanTag) {
 
 if (Number.isNaN(config.ownerTelegramId)) {
   throw new Error('OWNER_TELEGRAM_ID must be a valid number');
+}
+
+if (!config.warPollActiveMs) {
+  config.warPollActiveMs = config.warPollIntervalMs;
 }
 
 module.exports = config;
