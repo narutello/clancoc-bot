@@ -44,6 +44,9 @@ module.exports = async function linkCommand(ctx) {
       ctx.t('link.success_other', { tag, name, userId: targetTelegramId })
     );
   } catch (err) {
+    if (err.code && typeof err.code === 'string' && err.code.includes('.')) {
+      return ctx.reply(ctx.t(err.code));
+    }
     return ctx.reply(ctx.t('common.error', { message: err.message }));
   }
 };

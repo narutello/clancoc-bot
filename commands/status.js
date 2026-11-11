@@ -10,7 +10,10 @@ const {
   parseClashTime,
   getAttacksPerMember,
   normalizeTag,
+  warStateLabel,
+  formatWarTime,
 } = require('../utils/helpers');
+const { formatCwlDayLabel } = require('../services/cwlService');
 const {
   sendLoading,
   replaceLoadingText,
@@ -31,50 +34,16 @@ function formatUptime(sec) {
   return `${r}s`;
 }
 
-function formatAgo(date) {
+function formatAgo(date, t) {
   if (!date) return '—';
   const ms = Date.now() - new Date(date).getTime();
   if (Number.isNaN(ms) || ms < 0) return '—';
   const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return t('status.ago_sec', { n: sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t('status.ago_min', { n: min });
   const h = Math.floor(min / 60);
-  return `${h}h ago`;
-}
-
-function warStateEn(state) {
-  const map = {
-    notInWar: 'Not in war',
-    preparation: 'Preparation',
-    inWar: 'In war',
-    warEnded: 'War ended',
-    ended: 'Ended',
-  };
-  return map[state] || String(state || 'unknown');
-}
-
-function cwlDayEn(day, total) {
-  if (!day) return 'CWL';
-  if (total) return `Day ${day}/${total}`;
-  return `Day ${day}`;
-}
-
-function formatTimeEn(date) {
-  if (!date || !(date instanceof Date) || Number.isNaN(date.getTime())) return null;
-  try {
-    return new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Tehran',
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).format(date);
-  } catch {
-    return date.toISOString();
-  }
+  return t('status.ago_hour', { n: h });
 }
 
 function buildWarKey(war) {
@@ -82,8 +51,8 @@ function buildWarKey(war) {
   const opp = normalizeTag(war.opponent?.tag || 'unknown');
   const start =
     parseClashTime(war.preparationStartTime) || parseClashTime(war.startTime);
-  const t = start ? start.getTime() : 0;
-  return `${opp}_${t}`;
+  const ts = start ? start.getTime() : 0;
+  return `${opp}_${ts}`;
 }
 
 async function notificationMark(warKey, eventType) {
@@ -102,30 +71,41 @@ async function countRows(sql) {
 
 module.exports = async function statusCommand(ctx) {
   if (!isOwner(ctx)) {
-    return ctx.reply('⛔️ This command is owner-only.');
+    return ctx.reply(ctx.t('status.owner_only'));
   }
 
-  const loadingMsg = await sendLoading(ctx, '⏳ Loading status...');
+  const t = ctx.t.bind(ctx);
+  const lang = ctx.lang || 'fa';
+  const loadingMsg = await sendLoading(ctx, t('status.loading'));
 
   try {
     const mon = getMonitorStats();
     const lines = [];
-    lines.push('🟢 <b>Bot online</b>');
-    lines.push(`⏱ Uptime: ~${escapeHtml(formatUptime(process.uptime()))}`);
+    lines.push(t('status.online'));
+    lines.push(t('status.uptime', { uptime: formatUptime(process.uptime()) }));
 
-    const nextSec =
-      mon.nextPollMs != null ? Math.round(mon.nextPollMs / 1000) : null;
     lines.push(
-      `📡 Adaptive poll: idle ${Math.round(config.warPollIdleMs / 1000)}s · active ${Math.round(config.warPollActiveMs / 1000)}s · near ${Math.round(config.warPollNearMs / 1000)}s`
+      t('status.poll_adaptive', {
+        idle: Math.round(config.warPollIdleMs / 1000),
+        active: Math.round(config.warPollActiveMs / 1000),
+        near: Math.round(config.warPollNearMs / 1000),
+      })
     );
-    if (nextSec != null) {
+
+    if (mon.nextPollMs != null) {
       lines.push(
-        `⏭ Next poll: ~${nextSec}s (<code>${escapeHtml(mon.adaptiveReason || '—')}</code>)`
+        t('status.next_poll', {
+          sec: Math.round(mon.nextPollMs / 1000),
+          reason: mon.adaptiveReason || '—',
+        })
       );
     }
     if (mon.lastPollAt) {
       lines.push(
-        `🔄 Last poll: ${escapeHtml(formatAgo(mon.lastPollAt))} ${mon.lastPollOk === false ? '❌' : '✅'}`
+        t('status.last_poll', {
+          ago: formatAgo(mon.lastPollAt, t),
+          ok: mon.lastPollOk === false ? '❌' : '✅',
+        })
       );
     }
 
@@ -136,12 +116,11 @@ module.exports = async function statusCommand(ctx) {
       dbOk = true;
       lastCheck = res.rows[0]?.updated_at || null;
     } catch (err) {
-      dbOk = false;
-      lines.push(`🗄 Database: ❌ ${escapeHtml(err.message)}`);
+      lines.push(t('status.db_fail', { message: escapeHtml(err.message) }));
     }
     if (dbOk) {
-      lines.push('🗄 Database: OK');
-      lines.push(`🔄 Last state update: ${escapeHtml(formatAgo(lastCheck))}`);
+      lines.push(t('status.db_ok'));
+      lines.push(t('status.last_state', { ago: formatAgo(lastCheck, t) }));
     }
 
     let apiOk = false;
@@ -154,12 +133,12 @@ module.exports = async function statusCommand(ctx) {
     }
     lines.push(
       apiOk
-        ? '🎮 Clash API: OK'
-        : `🎮 Clash API: ❌ ${escapeHtml(apiErr || 'error')}`
+        ? t('status.api_ok')
+        : t('status.api_fail', { message: escapeHtml(apiErr || 'error') })
     );
 
     lines.push('');
-    lines.push('── <b>War</b> ──');
+    lines.push(t('status.section_war'));
 
     let activeWar = null;
     let isCwl = false;
@@ -187,13 +166,15 @@ module.exports = async function statusCommand(ctx) {
         }
       } catch (err) {
         if (!err.isNotFound) {
-          lines.push(`⚠️ War fetch error: ${escapeHtml(err.message)}`);
+          lines.push(
+            t('status.war_fetch_err', { message: escapeHtml(err.message) })
+          );
         }
       }
     }
 
     if (!activeWar) {
-      lines.push('Clan is not in war right now.');
+      lines.push(t('status.not_in_war'));
     } else {
       const our = activeWar.clan || {};
       const opp = activeWar.opponent || {};
@@ -207,18 +188,27 @@ module.exports = async function statusCommand(ctx) {
       const atkPer = getAttacksPerMember(activeWar, isCwl);
       const used = members.reduce((s, m) => s + (m.attacks || []).length, 0);
       const maxAtk = (activeWar.teamSize || members.length) * atkPer;
-      const pending = members.filter((m) => (m.attacks || []).length < atkPer).length;
+      const pending = members.filter((m) => (m.attacks || []).length < atkPer)
+        .length;
 
       if (isCwl && cwlMeta) {
         lines.push(
-          `⚔️ Type: <b>CWL</b> · ${escapeHtml(
-            cwlDayEn(cwlMeta.cwlDay, cwlMeta.cwlTotalDays)
-          )}`
+          t('status.type_cwl', {
+            day: formatCwlDayLabel(
+              cwlMeta.cwlDay,
+              cwlMeta.cwlTotalDays,
+              lang
+            ),
+          })
         );
       } else {
-        lines.push('⚔️ Type: <b>Regular war</b>');
+        lines.push(t('status.type_regular'));
       }
-      lines.push(`⏳ State: <b>${escapeHtml(warStateEn(activeWar.state))}</b>`);
+      lines.push(
+        t('status.state', {
+          state: warStateLabel(activeWar.state, lang),
+        })
+      );
       lines.push(
         `🏰 ${escapeHtml(ourName)} · ${our.stars ?? 0}⭐ · ${(our.destructionPercentage ?? 0).toFixed(1)}%`
       );
@@ -230,29 +220,35 @@ module.exports = async function statusCommand(ctx) {
         const start =
           parseClashTime(activeWar.startTime) ||
           parseClashTime(activeWar.preparationStartTime);
-        const formatted = formatTimeEn(start);
-        if (formatted) lines.push(`🕐 Battle starts: ${escapeHtml(formatted)} (Tehran)`);
+        const formatted = formatWarTime(start, lang);
+        if (formatted) {
+          lines.push(t('status.battle_starts', { time: formatted }));
+        }
       } else if (activeWar.state === 'inWar') {
         const end = parseClashTime(activeWar.endTime);
-        const formatted = formatTimeEn(end);
-        if (formatted) lines.push(`🕐 War ends: ${escapeHtml(formatted)} (Tehran)`);
+        const formatted = formatWarTime(end, lang);
+        if (formatted) {
+          lines.push(t('status.war_ends', { time: formatted }));
+        }
       }
 
-      lines.push(`⚔️ Attacks: <b>${used}/${maxAtk}</b>`);
-      lines.push(`⚠️ Incomplete attacks: <b>${pending}</b> player(s)`);
+      lines.push(t('status.attacks', { used, max: maxAtk }));
+      lines.push(t('status.incomplete', { count: pending }));
 
       try {
         const tags = members.map((m) => m.tag).filter(Boolean);
         const map = await getLinksForTags(tags);
         let linked = 0;
-        for (const t of tags) {
-          if ((map.get(t) || []).length > 0) linked += 1;
+        for (const x of tags) {
+          if ((map.get(x) || []).length > 0) linked += 1;
         }
-        lines.push(`📋 Linked war members: <b>${linked}/${tags.length}</b>`);
+        lines.push(
+          t('status.linked_members', { linked, total: tags.length })
+        );
       } catch (_) {}
 
       lines.push('');
-      lines.push('── <b>Notifications (this war)</b> ──');
+      lines.push(t('status.section_notif'));
       const warKey = buildWarKey(activeWar);
       if (isCwl) {
         const leagueKey = buildCwlLeagueKey(cwlMeta?.cwlSeason);
@@ -260,63 +256,87 @@ module.exports = async function statusCommand(ctx) {
         const start = await notificationMark(warKey, 'cwl_battle_start');
         const hour = await notificationMark(warKey, 'cwl_one_hour_left');
         const ended = await notificationMark(warKey, 'cwl_war_ended');
-        lines.push(`${prep} League preparation (day 1)`);
-        lines.push(`${start} Battle start (this day)`);
-        lines.push(`${hour} 1 hour left`);
-        lines.push(`${ended} War ended`);
+        lines.push(`${prep} ${t('status.n_league_prep')}`);
+        lines.push(`${start} ${t('status.n_battle_start')}`);
+        lines.push(`${hour} ${t('status.n_one_hour')}`);
+        lines.push(`${ended} ${t('status.n_war_ended')}`);
       } else {
         const prep = await notificationMark(warKey, 'preparation');
         const start = await notificationMark(warKey, 'battle_start');
         const hour = await notificationMark(warKey, 'one_hour_left');
         const ended = await notificationMark(warKey, 'war_ended');
-        lines.push(`${prep} Preparation / opponent found`);
-        lines.push(`${start} Battle start`);
-        lines.push(`${hour} 1 hour left`);
-        lines.push(`${ended} War ended`);
+        lines.push(`${prep} ${t('status.n_prep')}`);
+        lines.push(`${start} ${t('status.n_battle')}`);
+        lines.push(`${hour} ${t('status.n_one_hour')}`);
+        lines.push(`${ended} ${t('status.n_war_ended')}`);
       }
     }
 
     lines.push('');
-    lines.push('── <b>Links</b> ──');
+    lines.push(t('status.section_links'));
     try {
-      const users = await countRows('SELECT COUNT(*)::int AS c FROM telegram_users');
-      const links = await countRows('SELECT COUNT(*)::int AS c FROM user_accounts');
-      const accounts = await countRows('SELECT COUNT(*)::int AS c FROM clash_accounts');
-      lines.push(`👤 Telegram users: <b>${users}</b>`);
-      lines.push(`🎮 Clash accounts: <b>${accounts}</b>`);
-      lines.push(`🔗 User↔account links: <b>${links}</b>`);
+      const users = await countRows(
+        'SELECT COUNT(*)::int AS c FROM telegram_users'
+      );
+      const links = await countRows(
+        'SELECT COUNT(*)::int AS c FROM user_accounts'
+      );
+      const accounts = await countRows(
+        'SELECT COUNT(*)::int AS c FROM clash_accounts'
+      );
+      lines.push(t('status.tg_users', { n: users }));
+      lines.push(t('status.clash_accounts', { n: accounts }));
+      lines.push(t('status.user_links', { n: links }));
     } catch (err) {
-      lines.push(`⚠️ Link counts failed: ${escapeHtml(err.message)}`);
+      lines.push(
+        t('status.links_fail', { message: escapeHtml(err.message) })
+      );
     }
 
     lines.push('');
-    lines.push('── <b>Technical (Owner)</b> ──');
+    lines.push(t('status.section_tech'));
     lines.push(
-      `📣 TELEGRAM_GROUP_ID: ${config.telegramGroupId ? 'set' : '❌ not set'}`
+      config.telegramGroupId ? t('status.group_set') : t('status.group_missing')
     );
     lines.push(
-      `📝 LOG_TELEGRAM_ID: ${config.logTelegramId ? 'set' : '❌ not set'}`
+      config.logTelegramId ? t('status.log_set') : t('status.log_missing')
     );
-    lines.push(`🏷 CLAN_TAG: <code>#${escapeHtml(config.clanTag)}</code>`);
+    lines.push(t('status.clan_tag', { tag: escapeHtml(config.clanTag) }));
     lines.push(
-      `🧠 Rate /war: ${config.warCmdLimit} per ${Math.round(config.warCmdWindowMs / 1000)}s`
+      t('status.rate_war', {
+        limit: config.warCmdLimit,
+        sec: Math.round(config.warCmdWindowMs / 1000),
+      })
     );
     lines.push(
-      `🧠 Rate /cwl: ${config.cwlCmdLimit} per ${Math.round(config.cwlCmdWindowMs / 1000)}s`
+      t('status.rate_cwl', {
+        limit: config.cwlCmdLimit,
+        sec: Math.round(config.cwlCmdWindowMs / 1000),
+      })
     );
-    lines.push(`💾 War cache TTL: ${config.warCacheTtlMs}ms`);
-    lines.push(`📊 Monitor polls: ${mon.pollCount} · errors: ${mon.errorCount}`);
+    lines.push(t('status.cache_ttl', { ms: config.warCacheTtlMs }));
+    lines.push(
+      t('status.monitor_stats', {
+        polls: mon.pollCount,
+        errors: mon.errorCount,
+      })
+    );
 
-    return replaceLoadingText(ctx, loadingMsg, lines.join(String.fromCharCode(10)), {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    });
+    return replaceLoadingText(
+      ctx,
+      loadingMsg,
+      lines.join(String.fromCharCode(10)),
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }
+    );
   } catch (err) {
     console.error('[/status]', err.message);
     return replaceLoadingText(
       ctx,
       loadingMsg,
-      `❌ Status failed: ${err.message}`
+      t('status.failed', { message: err.message })
     );
   }
 };

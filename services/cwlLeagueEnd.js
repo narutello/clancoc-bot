@@ -1,79 +1,68 @@
+const { getCwlStandings, buildCwlLeagueKey } = require('./cwlService');
 const { getLinksForTags } = require('./linkService');
-const {
-  escapeHtml,
-  tgUserLink,
-  normalizeTag,
-} = require('../utils/helpers');
+const { escapeHtml, tgUserLink, normalizeTag } = require('../utils/helpers');
+const { t } = require('../utils/i18n');
 const { tgLog } = require('../utils/telegramLogger');
-const {
-  getCwlStandings,
-  buildCwlLeagueKey,
-} = require('./cwlService');
+const { groupLang } = require('./warNotify');
 
-/** Minimum attack stars across the league to appear in special thanks */
 const THANKS_MIN_STARS = 15;
 
-/**
- * Mention only linked Telegram users for the given clash tags.
- * Prefer @username; otherwise clickable first_name / in-game name (never the word «منشن»).
- */
-async function buildThanksMentionsHtml(playerStarsMap) {
-  const entries = Object.entries(playerStarsMap || {})
+function mentionLabel(u, m, lang) {
+  if (u.username) {
+    return `<a href="tg://user?id=${u.telegram_id}">@${escapeHtml(u.username)}</a>`;
+  }
+  const label =
+    (u.first_name && String(u.first_name).trim()) ||
+    (m.name && String(m.name).trim()) ||
+    t('common.player_fallback', { lng: lang });
+  return tgUserLink(u.telegram_id, label);
+}
+
+async function buildThanksMentionsHtml(ourPlayerStars, lang) {
+  const entries = Object.entries(ourPlayerStars || {})
     .map(([tag, info]) => ({
       tag: normalizeTag(tag),
-      stars: Number(info?.stars) || 0,
-      name: info?.name || tag,
+      stars: Number(info.stars || 0),
+      name: info.name || tag,
     }))
-    .filter((e) => e.tag && e.stars >= THANKS_MIN_STARS)
+    .filter((x) => x.stars >= THANKS_MIN_STARS)
     .sort((a, b) => b.stars - a.stars);
 
   if (!entries.length) {
-    return `<p>💚 از همه اعضای کلن بابت تلاش این فصل ممنونیم.</p>`;
+    return `<p>${t('notify.thanks_all', { lng: lang })}</p>`;
   }
 
-  const tags = entries.map((e) => e.tag);
-  const linksMap = await getLinksForTags(tags);
-  const nameByTag = new Map(entries.map((e) => [e.tag, e.name]));
+  const map = await getLinksForTags(entries.map((e) => e.tag));
+  const seen = new Set();
+  const mentionParts = [];
 
-  const seenIds = new Set();
-  const parts = [];
-
-  for (const e of entries) {
-    const links = linksMap.get(e.tag) || [];
+  for (const m of entries) {
+    const links = map.get(m.tag) || [];
     for (const u of links) {
       const id = u.telegram_id;
-      if (id == null || seenIds.has(id)) continue;
-      seenIds.add(id);
-
-      if (u.username) {
-        // Real @username, still deep-linked so notification works in groups
-        parts.push(
-          `<a href="tg://user?id=${id}">@${escapeHtml(u.username)}</a>`
-        );
-      } else {
-        // No public username → Telegram cannot show @handle; use name (opens profile)
-        const label =
-          (u.first_name && String(u.first_name).trim()) ||
-          nameByTag.get(e.tag) ||
-          'بازیکن';
-        parts.push(tgUserLink(id, label));
-      }
+      if (id == null || seen.has(id)) continue;
+      seen.add(id);
+      mentionParts.push(mentionLabel(u, m, lang));
     }
   }
 
-  if (!parts.length) {
-    // Eligible by stars but nobody linked their account
+  if (!mentionParts.length) {
     return (
-      `<p>⭐ این فصل چند نفر حداقل ${THANKS_MIN_STARS} ستاره گرفتند؛ ` +
-      `برای منشن شدن اکانت‌شان را به ربات لینک کنند.</p>` +
-      `<p>💚 از بقیه اعضای کلن هم ممنونیم.</p>`
+      `<p>${t('notify.thanks_unlinked', {
+        lng: lang,
+        min: THANKS_MIN_STARS,
+      })}</p>` +
+      `<p>${t('notify.thanks_rest', { lng: lang })}</p>`
     );
   }
 
   return (
-    `<p>⭐ با تشکر ویژه از کسانی که حداقل <b>${THANKS_MIN_STARS}</b> ستاره گرفتند:<br/>` +
-    `${parts.join(' · ')}</p>` +
-    `<p>💚 و از بقیه اعضای کلن هم بابت همراهی این فصل ممنونیم.</p>`
+    `<p>${t('notify.thanks_special', {
+      lng: lang,
+      min: THANKS_MIN_STARS,
+      list: mentionParts.join(' · '),
+    })}</p>` +
+    `<p>${t('notify.thanks_rest', { lng: lang })}</p>`
   );
 }
 
@@ -96,7 +85,11 @@ function buildLeagueEndStandingsTable(standings) {
     .join('');
 }
 
-async function notifyCwlLeagueEnded(bot, found, { hasNotification, markNotification, sendToGroup }) {
+async function notifyCwlLeagueEnded(
+  bot,
+  found,
+  { hasNotification, markNotification, sendToGroup }
+) {
   let data;
   try {
     data = await getCwlStandings({ forceFresh: true });
@@ -132,30 +125,45 @@ async function notifyCwlLeagueEnded(bot, found, { hasNotification, markNotificat
   if (!leagueFinished) return;
   if ((data.activeWars || 0) > 0 && !groupEnded) return;
 
+  const lang = await groupLang();
   const our = data.ourRow;
   const totalClans = data.standings.length;
   const seasonLine = data.season
-    ? `<p>📅 فصل: <b>${escapeHtml(String(data.season))}</b></p>`
+    ? `<p>${t('cwl.season', {
+        lng: lang,
+        season: escapeHtml(String(data.season)),
+      })}</p>`
     : '';
   const summary = our
-    ? `<p>🏅 رتبه کلن ما: <b>${our.rank} از ${totalClans}</b><br/>⭐ مجموع ستاره: <b>${our.stars}</b><br/>🏆 تعداد برد: <b>${our.wins}</b></p>`
+    ? `<p>${t('notify.league_rank', {
+        lng: lang,
+        rank: our.rank,
+        total: totalClans,
+        stars: our.stars,
+        wins: our.wins,
+      })}</p>`
     : '';
 
-  const thanks = await buildThanksMentionsHtml(data.ourPlayerStars || {});
+  const thanks = await buildThanksMentionsHtml(data.ourPlayerStars || {}, lang);
   const rows = buildLeagueEndStandingsTable(data.standings);
 
-  const html = `<h2>🏁 لیگ کلن‌ها به پایان رسید!</h2>
+  const html = `<h2>${t('notify.league_ended_title', { lng: lang })}</h2>
 ${seasonLine}
-<p>🏟 نتیجه نهایی گروه</p>
+<p>${t('notify.league_final', { lng: lang })}</p>
 <table bordered striped compact>
-<tr><th>#</th><th>کلن</th><th>ستاره</th><th>تخریب</th></tr>
+<tr><th>${t('common.rank', { lng: lang })}</th><th>${t('common.clan', {
+    lng: lang,
+  })}</th><th>${t('common.stars', { lng: lang })}</th><th>${t(
+    'common.destruction',
+    { lng: lang }
+  )}</th></tr>
 ${rows}
 </table>
 ${summary}
 ${thanks}
-<p>خسته نباشید 💪</p>`.trim();
+<p>${t('notify.good_job', { lng: lang })}</p>`.trim();
 
-  await sendToGroup(bot, html);
+  await sendToGroup(bot, html, lang);
   await tgLog.info(
     `Notification sent: CWL league ended — rank ${our?.rank || '?'}/${totalClans}`,
     {
