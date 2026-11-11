@@ -1,4 +1,4 @@
-const { listLinks, upsertTelegramUser } = require('../services/linkService');
+const { getUserAccounts, upsertTelegramUser } = require('../services/linkService');
 const { formatTag } = require('../utils/helpers');
 
 module.exports = async function myAccountsCommand(ctx) {
@@ -6,13 +6,13 @@ module.exports = async function myAccountsCommand(ctx) {
   await upsertTelegramUser(from);
 
   try {
-    const links = await listLinks(from.id);
+    const links = await getUserAccounts(from.id);
     if (!links.length) {
       return ctx.reply(ctx.t('myaccounts.empty'));
     }
     const list = links
       .map((row, i) => {
-        const tag = formatTag(row.clash_tag || row.tag);
+        const tag = formatTag(row.tag);
         const name = row.name ? ` — ${row.name}` : '';
         return `${i + 1}. ${tag}${name}`;
       })

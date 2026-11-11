@@ -11,6 +11,7 @@ const {
   formatWarTime,
   getAttacksPerMember,
 } = require('../utils/helpers');
+const { t, DEFAULT_LANG } = require('../utils/i18n');
 
 function extractMembers(war) {
   const clan = war.clan || {};
@@ -39,10 +40,14 @@ function getPendingAttackers(members, attacksPerMember) {
     .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0));
 }
 
-async function buildPendingAttackersHtml(members, attacksPerMember) {
+async function buildPendingAttackersHtml(
+  members,
+  attacksPerMember,
+  lang = DEFAULT_LANG
+) {
   const pending = getPendingAttackers(members, attacksPerMember);
   if (pending.length === 0) {
-    return '<p>✅ همه اعضا حمله‌های خود را انجام داده‌اند.</p>';
+    return `<p>${t('notify.pending_all_done', { lng: lang })}</p>`;
   }
 
   const tags = pending.map((m) => m.tag);
@@ -79,7 +84,7 @@ async function buildPendingAttackersHtml(members, attacksPerMember) {
         const label =
           (u.first_name && String(u.first_name).trim()) ||
           (m.name && String(m.name).trim()) ||
-          'بازیکن';
+          t('common.player_fallback', { lng: lang });
         mentionParts.push(tgUserLink(id, label));
       }
     }
@@ -87,13 +92,21 @@ async function buildPendingAttackersHtml(members, attacksPerMember) {
 
   const mentionsLine =
     mentionParts.length > 0
-      ? `<p>📣 منشن‌ها: ${mentionParts.join(' · ')}</p>`
+      ? `<p>${t('notify.mentions', {
+          lng: lang,
+          list: mentionParts.join(' · '),
+        })}</p>`
       : '';
 
   return (
-    `<p>⚠️ حمله باقی‌مانده: <b>${pending.length}</b> نفر</p>` +
+    `<p>${t('notify.pending_count', {
+      lng: lang,
+      count: pending.length,
+    })}</p>` +
     `<table bordered striped compact>` +
-    `<tr><th>#</th><th>بازیکن</th><th>حمله</th></tr>` +
+    `<tr><th>${t('common.rank', { lng: lang })}</th><th>${t('common.player', {
+      lng: lang,
+    })}</th><th>${t('common.attack', { lng: lang })}</th></tr>` +
     rows +
     `</table>` +
     mentionsLine
@@ -127,7 +140,13 @@ async function buildMembersTableRows(members, attacksPerMember = 2) {
     .join('');
 }
 
-async function buildWarRichHtml(war, title, extraHtml = '', cwlMeta = null) {
+async function buildWarRichHtml(
+  war,
+  title,
+  extraHtml = '',
+  cwlMeta = null,
+  lang = DEFAULT_LANG
+) {
   const our = war.clan || {};
   const opp = war.opponent || {};
   const members = extractMembers(war);
@@ -138,12 +157,16 @@ async function buildWarRichHtml(war, title, extraHtml = '', cwlMeta = null) {
   if (war.state === 'preparation') {
     const start =
       parseClashTime(war.startTime) || parseClashTime(war.preparationStartTime);
-    const formatted = formatWarTime(start);
-    if (formatted) timeInfo = `<p>🕐 شروع نبرد: <b>${formatted}</b></p>`;
+    const formatted = formatWarTime(start, lang);
+    if (formatted) {
+      timeInfo = `<p>${t('war.start_time', { lng: lang, time: formatted })}</p>`;
+    }
   } else if (war.state === 'inWar') {
     const end = parseClashTime(war.endTime);
-    const formatted = formatWarTime(end);
-    if (formatted) timeInfo = `<p>🕐 پایان وار: <b>${formatted}</b></p>`;
+    const formatted = formatWarTime(end, lang);
+    if (formatted) {
+      timeInfo = `<p>${t('war.end_time', { lng: lang, time: formatted })}</p>`;
+    }
   }
   const isCwlWar =
     Boolean(cwlMeta && cwlMeta.cwlDay) || Boolean(war.__cwlMeta);
@@ -153,21 +176,40 @@ async function buildWarRichHtml(war, title, extraHtml = '', cwlMeta = null) {
   );
   const dayLine =
     cwlMeta && cwlMeta.cwlDay
-      ? `<p>📅 <b>${formatCwlDayLabel(cwlMeta.cwlDay, cwlMeta.cwlTotalDays)}</b> لیگ کلن‌ها</p>`
+      ? `<p>${t('cwl.day_line', {
+          lng: lang,
+          dayLabel: formatCwlDayLabel(
+            cwlMeta.cwlDay,
+            cwlMeta.cwlTotalDays,
+            lang
+          ),
+        })}</p>`
       : '';
   return `<h2>${title}</h2>
 ${dayLine}
 <table bordered striped compact>
-<tr><th>کلن</th><th>ستاره</th><th>تخریب</th></tr>
+<tr><th>${t('common.clan', { lng: lang })}</th><th>${t('common.stars', {
+    lng: lang,
+  })}</th><th>${t('common.destruction', { lng: lang })}</th></tr>
 <tr><td>🏰 ${escapeHtml(ourName)}</td><td>${our.stars ?? 0} ⭐</td><td>${(our.destructionPercentage ?? 0).toFixed(1)}%</td></tr>
 <tr><td>⚡ ${escapeHtml(oppName)}</td><td>${opp.stars ?? 0} ⭐</td><td>${(opp.destructionPercentage ?? 0).toFixed(1)}%</td></tr>
 </table>
-<p>👥 ${teamSize}v${teamSize}<br/>⏳ وضعیت: <b>${escapeHtml(warStateLabel(war.state))}</b></p>
+<p>${t('war.team_size', { lng: lang, size: teamSize })}<br/>${t(
+    'war.state_line',
+    { lng: lang, state: warStateLabel(war.state, lang) }
+  )}</p>
 ${timeInfo}
 ${extraHtml}
-<h3>📋 اعضای وار</h3>
+<h3>${t('war.members_heading', { lng: lang })}</h3>
 <table bordered striped compact>
-<tr><th>#</th><th>بازیکن</th><th>TH</th><th>حمله</th><th>ستاره</th><th>دفاع</th></tr>
+<tr><th>${t('common.rank', { lng: lang })}</th><th>${t('common.player', {
+    lng: lang,
+  })}</th><th>${t('common.th', { lng: lang })}</th><th>${t('common.attack', {
+    lng: lang,
+  })}</th><th>${t('common.stars', { lng: lang })}</th><th>${t(
+    'common.defense',
+    { lng: lang }
+  )}</th></tr>
 ${rows}
 </table>`.trim();
 }
