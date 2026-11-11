@@ -1,12 +1,13 @@
-const i18next = require('i18next');
 const fa = require('../locales/fa.json');
 const en = require('../locales/en.json');
 
 const SUPPORTED = ['fa', 'en'];
 const DEFAULT_LANG = 'fa';
 
-let ready = false;
-let initPromise = null;
+const catalogs = {
+  fa,
+  en,
+};
 
 function normalizeLang(code) {
   if (!code) return null;
@@ -15,52 +16,54 @@ function normalizeLang(code) {
   return null;
 }
 
-/** Map Telegram language_code → supported lang; default fa */
 function detectFromTelegramLanguageCode(languageCode) {
   const n = normalizeLang(languageCode);
   return n || DEFAULT_LANG;
 }
 
-async function initI18n() {
-  if (ready) return i18next;
-  if (initPromise) return initPromise;
+function getByPath(obj, path) {
+  if (!obj || !path) return undefined;
+  const parts = String(path).split('.');
+  let cur = obj;
+  for (const p of parts) {
+    if (cur == null || typeof cur !== 'object') return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
 
-  initPromise = i18next.init({
-    lng: DEFAULT_LANG,
-    fallbackLng: DEFAULT_LANG,
-    supportedLngs: SUPPORTED,
-    nonExplicitSupportedLngs: true,
-    resources: {
-      fa: { translation: fa },
-      en: { translation: en },
-    },
-    interpolation: {
-      escapeValue: false,
-    },
-    returnNull: false,
-    returnEmptyString: false,
-  }).then(() => {
-    ready = true;
-    return i18next;
+function interpolate(str, params) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    if (params && Object.prototype.hasOwnProperty.call(params, key)) {
+      const v = params[key];
+      return v == null ? '' : String(v);
+    }
+    return '';
   });
-
-  return initPromise;
 }
 
 /**
- * Translate a key for an explicit language (never mutates global lng).
+ * Translate a key for an explicit language (never mutates global state).
  * @param {string} key
  * @param {object} [options]
  * @param {string} [options.lng]
  */
 function t(key, options = {}) {
   const lng = normalizeLang(options.lng) || DEFAULT_LANG;
-  const { lng: _ignored, ...rest } = options;
-  if (!ready) {
-    // Sync fallback before init finishes — still scoped by lng via clone
-    return i18next.t(key, { lng, ...rest });
+  const { lng: _ignored, ...params } = options;
+
+  let value = getByPath(catalogs[lng], key);
+  if (value == null && lng !== DEFAULT_LANG) {
+    value = getByPath(catalogs[DEFAULT_LANG], key);
   }
-  return i18next.t(key, { lng, ...rest });
+  if (value == null) return key;
+  if (typeof value !== 'string') return String(value);
+  return interpolate(value, params);
+}
+
+async function initI18n() {
+  return true;
 }
 
 function isRtl(lang) {
