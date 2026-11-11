@@ -102,9 +102,10 @@ async function isInCwl() {
   }
 }
 
-function formatCwlDayLabel(cwlDay, cwlTotalDays) {
+function formatCwlDayLabel(cwlDay, cwlTotalDays, lang = 'fa') {
   if (!cwlDay || !cwlTotalDays) return '';
-  return `روز ${cwlDay} از ${cwlTotalDays}`;
+  const { t } = require('../utils/i18n');
+  return t('cwl.day_label', { lng: lang, day: cwlDay, total: cwlTotalDays });
 }
 
 function buildCwlLeagueKey(season) {
@@ -241,7 +242,6 @@ async function computeCwlStandings() {
       ourWarsTotal += 1;
       if (war.state === 'warEnded') ourWarsEnded += 1;
 
-      // Only players who actually appeared in our war maps
       for (const m of ourSide.members || []) {
         const mt = normalizeTag(m.tag);
         if (!mt) continue;
@@ -284,7 +284,6 @@ async function computeCwlStandings() {
 
   const ourRow = standings.find((r) => r.isOurs) || null;
 
-  // Serializable map for league-end thanks (tag -> { stars, name })
   const ourPlayerStars = {};
   for (const [tag, info] of ourPlayerStats.entries()) {
     ourPlayerStars[tag] = { stars: info.stars, name: info.name };
