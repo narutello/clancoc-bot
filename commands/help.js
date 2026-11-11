@@ -1,6 +1,4 @@
 const config = require('../config');
-const { withTelegramRetry } = require('../utils/telegramSafe');
-const { tgLog } = require('../utils/telegramLogger');
 
 function publicHelpText() {
   return `
@@ -44,104 +42,18 @@ function ownerHelpText() {
 
 <b>نکته</b>
 نوتیف‌های وار/CWL خودکار به گروه می‌روند.
-این راهنما فقط برای شما نمایش داده می‌شود.
 `.trim();
-}
-
-function isOwnerUser(userId) {
-  if (userId == null) return false;
-  const ownerId = Number(config.ownerTelegramId);
-  if (!Number.isFinite(ownerId)) return false;
-  return Number(userId) === ownerId;
-}
-
-async function sendDmHelp(telegram, userId, text) {
-  await withTelegramRetry(
-    () =>
-      telegram.sendMessage(userId, text, {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      }),
-    { maxRetries: config.telegramMaxRetries }
-  );
 }
 
 module.exports = async function helpCommand(ctx) {
   const userId = ctx.from?.id;
-  const isOwner = isOwnerUser(userId);
-  const isPrivate = !ctx.chat?.type || ctx.chat.type === 'private';
+  const ownerId = Number(config.ownerTelegramId);
+  const isOwner =
+    userId != null && Number.isFinite(ownerId) && Number(userId) === ownerId;
+
   const text = isOwner ? ownerHelpText() : publicHelpText();
 
-  try {
-    await tgLog.info(
-      `/help by ${userId}${isOwner ? ' (owner)' : ''}`,
-      {
-        chatId: ctx.chat?.id,
-        chatType: ctx.chat?.type,
-        username: ctx.from?.username || '',
-      },
-      { module: 'Help' }
-    );
-  } catch (_) {}
-
-  // PV: normal message
-  if (isPrivate) {
-    return ctx.reply(text, {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    });
-  }
-
-  if (!userId) {
-    return ctx.reply(publicHelpText(), {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    });
-  }
-
-  // Group: 1) try ephemeral (works reliably if bot is admin)
-  // Docs: non-admin bots need callback/ephemeral context; admin can use receiver_user_id.
-  try {
-    await withTelegramRetry(
-      () =>
-        ctx.telegram.callApi('sendMessage', {
-          chat_id: ctx.chat.id,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-          ephemeral_message_parameters: {
-            receiver_user_id: userId,
-          },
-        }),
-      { maxRetries: 1 }
-    );
-    return;
-  } catch (err) {
-    console.warn('[/help] ephemeral failed:', err.description || err.message);
-    try {
-      await tgLog.warn(
-        'Ephemeral /help failed; falling back to DM',
-        err.description || err.message,
-        { module: 'Help' }
-      );
-    } catch (_) {}
-  }
-
-  // 2) Fallback: DM only — do NOT post help publicly in the group
-  try {
-    await sendDmHelp(ctx.telegram, userId, text);
-    try {
-      await ctx.reply('📩 راهنما براتون توی پیوی ربات ارسال شد.', {
-        disable_notification: true,
-      });
-    } catch (_) {}
-    return;
-  } catch (err) {
-    console.warn('[/help] DM failed:', err.description || err.message);
-  }
-
-  // 3) Last resort: public message, but only public (non-owner) text
-  return ctx.reply(publicHelpText(), {
+  return ctx.reply(text, {
     parse_mode: 'HTML',
     disable_web_page_preview: true,
   });
