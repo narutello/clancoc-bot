@@ -12,6 +12,7 @@ const {
 } = require('../utils/helpers');
 const { withTelegramRetry } = require('../utils/telegramSafe');
 const { checkCommandLimit } = require('../utils/commandRateLimit');
+const { t, isRtl, DEFAULT_LANG } = require('../utils/i18n');
 
 function sortMembers(list) {
   return (list || [])
@@ -35,7 +36,7 @@ function memberLine(m, index, atkPer) {
   );
 }
 
-function buildWidgetHtml(resolved) {
+function buildWidgetHtml(resolved, lang = DEFAULT_LANG) {
   const { war, isCwl, cwlDay, cwlTotalDays } = resolved;
   const our = war.clan || {};
   const opp = war.opponent || {};
@@ -58,21 +59,15 @@ function buildWidgetHtml(resolved) {
   if (war.state === 'preparation') {
     const start =
       parseClashTime(war.startTime) || parseClashTime(war.preparationStartTime);
-    const f = formatWarTime(start);
+    const f = formatWarTime(start, lang);
     if (f) timeLine = escapeHtml(f);
   } else if (war.state === 'inWar') {
     const end = parseClashTime(war.endTime);
-    const f = formatWarTime(end);
+    const f = formatWarTime(end, lang);
     if (f) timeLine = escapeHtml(f);
   }
 
-  const statusMap = {
-    preparation: 'آماده‌سازی',
-    inWar: 'در حال جنگ',
-    warEnded: 'پایان یافته',
-  };
-  const status =
-    statusMap[war.state] || escapeHtml(warStateLabel(war.state));
+  const status = escapeHtml(warStateLabel(war.state, lang));
 
   const diff = ourStars - oppStars;
   const diffText =
@@ -93,15 +88,22 @@ function buildWidgetHtml(resolved) {
 
   const ourMore =
     ourAll.length > maxRows
-      ? `<p class="hint">+${ourAll.length - maxRows} عضو دیگر</p>`
+      ? `<p class="hint">+${ourAll.length - maxRows} ${t('testw.more_members', {
+          lng: lang,
+        })}</p>`
       : '';
   const oppMore =
     oppAll.length > maxRows
-      ? `<p class="hint">+${oppAll.length - maxRows} عضو دیگر</p>`
+      ? `<p class="hint">+${oppAll.length - maxRows} ${t('testw.more_members', {
+          lng: lang,
+        })}</p>`
       : '';
 
+  const dir = isRtl(lang) ? 'rtl' : 'ltr';
+  const htmlLang = lang === 'en' ? 'en' : 'fa';
+
   return `<!DOCTYPE html>
-<html dir="rtl" lang="fa">
+<html dir="${dir}" lang="${htmlLang}">
 <head>
 <meta charset="utf-8"/>
 <style>
@@ -137,23 +139,32 @@ button.on{outline:2px solid var(--tg-theme-button-color,#55ce8a)}
 <p class="sub">${sub}</p>
 <div class="teams">
   <div class="card">
-    <div class="lbl">کلن شما</div>
+    <div class="lbl">${t('testw.our_clan', { lng: lang })}</div>
     <div class="sc">${ourStars} ⭐</div>
     <div class="lbl">${ourDest}% · ${teamSize}v${teamSize}</div>
   </div>
   <div class="card en">
-    <div class="lbl">حریف</div>
+    <div class="lbl">${t('common.opponent', { lng: lang })}</div>
     <div class="sc">${oppStars} ⭐</div>
     <div class="lbl">${oppDest}%</div>
   </div>
 </div>
-<p class="diff">اختلاف ستاره: <b>${diffText}</b></p>
+<p class="diff">${t('testw.star_diff', { lng: lang })}: <b>${diffText}</b></p>
 <div class="tabs">
-  <button type="button" class="on" data-t="m">بازیکنان</button>
-  <button type="button" data-t="e">حریف</button>
+  <button type="button" class="on" data-t="m">${t('testw.tab_players', {
+    lng: lang,
+  })}</button>
+  <button type="button" data-t="e">${t('common.opponent', {
+    lng: lang,
+  })}</button>
 </div>
-<div id="m" class="list">${ourRows || '<p class="hint">عضوی نیست</p>'}${ourMore}</div>
-<div id="e" class="list hid">${oppRows || '<p class="hint">اطلاعات حریف نیست</p>'}${oppMore}</div>
+<div id="m" class="list">${ourRows || `<p class="hint">${t('testw.no_members', {
+    lng: lang,
+  })}</p>`}${ourMore}</div>
+<div id="e" class="list hid">${oppRows || `<p class="hint">${t(
+    'testw.no_enemy',
+    { lng: lang }
+  )}</p>`}${oppMore}</div>
 <script>
 (function(){
   var tabs=document.querySelectorAll('button[data-t]');
@@ -189,6 +200,7 @@ function assertWidgetSize(html) {
 }
 
 module.exports = async function testwCommand(ctx) {
+  const lang = ctx.lang || DEFAULT_LANG;
   try {
     const userId = ctx.from?.id;
     const isOwner =
@@ -199,10 +211,9 @@ module.exports = async function testwCommand(ctx) {
       isOwner,
     });
     if (!limit.allowed) {
-      return ctx.reply(
-        `⏳ تعداد درخواست زیاد است. حدود <b>${limit.retryAfterSec}</b> ثانیه دیگر دوباره بزن.`,
-        { parse_mode: 'HTML' }
-      );
+      return ctx.reply(ctx.t('rate.war', { sec: limit.retryAfterSec }), {
+        parse_mode: 'HTML',
+      });
     }
 
     let resolved = await resolveRegularWar();
@@ -211,14 +222,17 @@ module.exports = async function testwCommand(ctx) {
     }
 
     if (!resolved || !resolved.war) {
-      return ctx.reply('در حال حاضر کلن در وار / CWL نیست.');
+      return ctx.reply(ctx.t('testw.not_in_war'));
     }
 
-    const html = buildWidgetHtml(resolved);
+    const html = buildWidgetHtml(resolved, lang);
     const size = assertWidgetSize(html);
     if (!size.ok) {
       return ctx.reply(
-        `❌ HTML ویجت از حد مجاز بزرگ‌تر است (raw=${size.raw}, zlib=${size.compressed}).`
+        ctx.t('testw.too_large', {
+          raw: size.raw,
+          zlib: size.compressed,
+        })
       );
     }
 
@@ -227,7 +241,7 @@ module.exports = async function testwCommand(ctx) {
         ctx.telegram.callApi('sendWidget', {
           chat_id: ctx.chat.id,
           html,
-          caption: '⚔️ وضعیت وار (Widget)',
+          caption: ctx.t('testw.caption'),
         }),
       { maxRetries: config.telegramMaxRetries }
     );
@@ -236,7 +250,6 @@ module.exports = async function testwCommand(ctx) {
     const desc = String(err.description || err.message || err);
     const lower = desc.toLowerCase();
 
-    // Production often still blocks widgets outside private chats
     if (
       lower.includes('private') ||
       lower.includes('chat_id') ||
@@ -244,14 +257,11 @@ module.exports = async function testwCommand(ctx) {
       lower.includes('not available') ||
       lower.includes('group')
     ) {
-      return ctx.reply(
-        '⚠️ تلگرام فعلاً ویجت را در این نوع چت پشتیبانی نمی‌کند.\n' +
-          'در چت خصوصی با ربات /testw را بزن، یا از /war استفاده کن.'
-      );
+      return ctx.reply(ctx.t('testw.chat_unsupported'));
     }
 
     return ctx.reply(
-      `❌ ارسال ویجت ناموفق بود:\n<code>${escapeHtml(desc)}</code>`,
+      ctx.t('testw.send_fail', { message: escapeHtml(desc) }),
       { parse_mode: 'HTML' }
     );
   }
