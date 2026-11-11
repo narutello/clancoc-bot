@@ -3,6 +3,7 @@ const { query } = require('../database');
 const { getCurrentWar, getClan } = require('../api/clash');
 const { findOurCwlWar, buildCwlLeagueKey } = require('../services/cwlService');
 const { getLinksForTags } = require('../services/linkService');
+const { getMonitorStats } = require('../services/monitorStats');
 const {
   escapeHtml,
   stripEmojis,
@@ -107,10 +108,26 @@ module.exports = async function statusCommand(ctx) {
   const loadingMsg = await sendLoading(ctx, '⏳ Loading status...');
 
   try {
+    const mon = getMonitorStats();
     const lines = [];
     lines.push('🟢 <b>Bot online</b>');
     lines.push(`⏱ Uptime: ~${escapeHtml(formatUptime(process.uptime()))}`);
-    lines.push(`📡 Polling: every ${Math.round(config.warPollIntervalMs / 1000)}s`);
+
+    const nextSec =
+      mon.nextPollMs != null ? Math.round(mon.nextPollMs / 1000) : null;
+    lines.push(
+      `📡 Adaptive poll: idle ${Math.round(config.warPollIdleMs / 1000)}s · active ${Math.round(config.warPollActiveMs / 1000)}s · near ${Math.round(config.warPollNearMs / 1000)}s`
+    );
+    if (nextSec != null) {
+      lines.push(
+        `⏭ Next poll: ~${nextSec}s (<code>${escapeHtml(mon.adaptiveReason || '—')}</code>)`
+      );
+    }
+    if (mon.lastPollAt) {
+      lines.push(
+        `🔄 Last poll: ${escapeHtml(formatAgo(mon.lastPollAt))} ${mon.lastPollOk === false ? '❌' : '✅'}`
+      );
+    }
 
     let dbOk = false;
     let lastCheck = null;
@@ -288,6 +305,7 @@ module.exports = async function statusCommand(ctx) {
       `🧠 Rate /cwl: ${config.cwlCmdLimit} per ${Math.round(config.cwlCmdWindowMs / 1000)}s`
     );
     lines.push(`💾 War cache TTL: ${config.warCacheTtlMs}ms`);
+    lines.push(`📊 Monitor polls: ${mon.pollCount} · errors: ${mon.errorCount}`);
 
     return replaceLoadingText(ctx, loadingMsg, lines.join(String.fromCharCode(10)), {
       parse_mode: 'HTML',
