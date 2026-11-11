@@ -2,6 +2,8 @@ const { Telegraf } = require('telegraf');
 const config = require('../config');
 const { tgLog } = require('../utils/telegramLogger');
 const { upsertTelegramUser } = require('../services/linkService');
+const i18nContext = require('../middleware/i18nContext');
+const { t } = require('../utils/i18n');
 
 const startCommand = require('../commands/start');
 const helpCommand = require('../commands/help');
@@ -26,6 +28,8 @@ const statusCommand = require('../commands/status');
 const testNotifyCommand = require('../commands/testnotify');
 const testLogCommand = require('../commands/testlog');
 const testwCommand = require('../commands/testw');
+const settingCommand = require('../commands/setting');
+const { settingAction } = settingCommand;
 
 function createBot() {
   const bot = new Telegraf(config.botToken);
@@ -40,8 +44,14 @@ function createBot() {
     return next();
   });
 
+  bot.use(i18nContext);
+
   bot.start(startCommand);
   bot.help(helpCommand);
+
+  bot.command('setting', settingCommand);
+  bot.command('settings', settingCommand);
+  bot.action(/^set:(g|u):(home|lang)(?::[a-z]{2})?$/, settingAction);
 
   bot.command('link', linkCommand);
   bot.command('unlink', unlinkCommand);
@@ -77,7 +87,8 @@ function createBot() {
       }
     );
     try {
-      await ctx.reply('⚠️ خطایی رخ داد. لطفاً بعداً دوباره تلاش کنید.');
+      const lang = ctx.lang || 'fa';
+      await ctx.reply(t('common.generic_error', { lng: lang }));
     } catch (_) {}
   });
 
