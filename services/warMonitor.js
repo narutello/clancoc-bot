@@ -25,6 +25,16 @@ const {
 
 let lastLoggedWarState = null;
 
+/** Consider a CWL day-end notification eligible if war ended within this window */
+const CWL_END_NOTIFY_WINDOW_MS = 8 * 60 * 60 * 1000;
+
+function isRecentlyEnded(war, windowMs = CWL_END_NOTIFY_WINDOW_MS) {
+  const end = parseClashTime(war?.endTime);
+  if (!end) return false;
+  const age = Date.now() - end.getTime();
+  return age >= 0 && age <= windowMs;
+}
+
 async function checkRegularWar(bot) {
   const last = await getLastState();
   let war;
@@ -34,19 +44,31 @@ async function checkRegularWar(bot) {
     if (err.isNotFound) war = { state: 'notInWar' };
     else throw err;
   }
+
   if (!war || war.state === 'notInWar') {
+    // Only close out *regular* wars here. During CWL the clan war endpoint is often
+    // notInWar; overwriting last state as is_cwl=false was skipping CWL day-end notifies.
     if (last && !last.is_cwl && last.state && last.state !== 'notInWar') {
       await notifyWarEndedFromSaved(bot, last, false);
+      await saveState({
+        state: 'notInWar',
+        isCwl: false,
+        opponentTag: null,
+        warTag: null,
+        membersJson: null,
+      });
+    } else if (!last?.is_cwl) {
+      await saveState({
+        state: 'notInWar',
+        isCwl: false,
+        opponentTag: null,
+        warTag: null,
+        membersJson: null,
+      });
     }
-    await saveState({
-      state: 'notInWar',
-      isCwl: false,
-      opponentTag: null,
-      warTag: null,
-      membersJson: null,
-    });
     return { state: 'notInWar', isCwl: false };
   }
+
   const members = extractMembers(war);
   if (war.state === 'preparation') await notifyPreparation(bot, war);
   if (war.state === 'inWar') {
@@ -83,7 +105,17 @@ async function checkCwl(bot) {
     await tgLog.warn('CWL lookup failed', err.message, { module: 'WarMonitor' });
     return null;
   }
-  if (!found || !found.war) return null;
+
+  const last = await getLastState();
+
+  // League / day data gone: if we were mid-CWL day, emit end from saved state once
+  if (!found || !found.war) {
+    if (last?.is_cwl && last.state && last.state !== 'notInWar' && last.state !== 'warEnded') {
+      await notifyWarEndedFromSaved(bot, last, true);
+    }
+    return null;
+  }
+
   const war = found.war;
   const meta = {
     cwlDay: found.cwlDay,
@@ -92,7 +124,6 @@ async function checkCwl(bot) {
   };
   war.__cwlMeta = meta;
 
-  const last = await getLastState();
   const warKey = buildWarKey(war);
   const lastKey = buildWarKeyFromSaved(last);
 
@@ -108,11 +139,25 @@ async function checkCwl(bot) {
       last.is_cwl &&
       lastKey === warKey &&
       (last.state === 'inWar' || last.state === 'preparation');
-    if (lastWasActive) {
+
+    // hasNotification inside notifyWarEnded still prevents duplicates.
+    // recentlyEnded covers the case where regular-war poll wiped is_cwl before we ran.
+    const recentlyEnded = isRecentlyEnded(war);
+
+    if (lastWasActive || recentlyEnded) {
       await notifyWarEnded(bot, war, true);
     } else {
       console.log(
-        `[WarMonitor] Skip stale CWL warEnded notify (day ${meta.cwlDay}, last=${last?.state || 'none'})`
+        `[WarMonitor] Skip stale CWL warEnded notify (day ${meta.cwlDay}, last=${last?.state || 'none'}, is_cwl=${last?.is_cwl ? 1 : 0})`
+      );
+      await tgLog.debug(
+        'Skipped stale CWL warEnded notify',
+        {
+          day: meta.cwlDay,
+          lastState: last?.state || 'none',
+          lastIsCwl: Boolean(last?.is_cwl),
+        },
+        { module: 'WarMonitor' }
       );
     }
   }
@@ -151,24 +196,30 @@ async function checkCwl(bot) {
 
 async function checkWarStatus(bot) {
   try {
+    // CWL first so day transitions are not lost when clan /currentwar is notInWar
+    const cwlWar = await checkCwl(bot);
     const war = await checkRegularWar(bot);
-    const state = war?.state || 'unknown';
-    const opp = war?.opponent?.name || war?.opponent?.tag || '-';
+    const state = cwlWar?.state || war?.state || 'unknown';
+    const opp =
+      cwlWar?.opponent?.name ||
+      cwlWar?.opponent?.tag ||
+      war?.opponent?.name ||
+      war?.opponent?.tag ||
+      '-';
     console.log(`[WarMonitor] Check done — state=${state} opponent=${opp}`);
     await tgLog.debug(
       `War poll OK — state=${state}`,
-      { opponent: String(opp).slice(0, 80) },
+      { opponent: String(opp).slice(0, 80), cwl: Boolean(cwlWar) },
       { module: 'WarMonitor' }
     );
     if (state !== lastLoggedWarState) {
       lastLoggedWarState = state;
       await tgLog.info(
         `War state changed → ${state}`,
-        { opponent: String(opp).slice(0, 80) },
+        { opponent: String(opp).slice(0, 80), cwl: Boolean(cwlWar) },
         { module: 'WarMonitor' }
       );
     }
-    await checkCwl(bot);
   } catch (err) {
     console.error('[WarMonitor] Error during check:', err.message);
     console.error(err.stack);
