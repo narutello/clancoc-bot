@@ -62,6 +62,22 @@ CREATE TABLE IF NOT EXISTS war_state (
 
 INSERT INTO war_state (id, state) VALUES (1, 'unknown')
 ON CONFLICT (id) DO NOTHING;
+
+-- Per-group settings (language, future options)
+CREATE TABLE IF NOT EXISTS chat_settings (
+  chat_id TEXT PRIMARY KEY,
+  language TEXT NOT NULL DEFAULT 'fa',
+  settings_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Per-user settings (private language, future options)
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id BIGINT PRIMARY KEY,
+  language TEXT NOT NULL DEFAULT 'fa',
+  settings_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `;
 
 async function migrate({ closePool = false } = {}) {
@@ -73,7 +89,6 @@ async function migrate({ closePool = false } = {}) {
     console.error('[DB] Migration failed:', err.message);
     throw err;
   } finally {
-    // فقط وقتی مستقیم با CLI اجرا شود pool را ببند
     if (closePool) {
       await pool.end();
     }
