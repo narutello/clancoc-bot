@@ -126,3 +126,4 @@ async function warHomeAction(ctx) {
 module.exports = warCommand;
 module.exports.warEnemyAction = warEnemyAction;
 module.exports.warHomeAction = warHomeAction;
+module.exports.resolveRegularWar = resolveRegularWar;

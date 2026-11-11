@@ -133,3 +133,4 @@ module.exports = cwlCommand;
 module.exports.cwlEnemyAction = cwlEnemyAction;
 module.exports.cwlHomeAction = cwlHomeAction;
 module.exports.cwlStandingsAction = cwlStandingsAction;
+module.exports.resolveCwlWar = resolveCwlWar;
