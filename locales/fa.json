@@ -2,114 +2,105 @@
   "common": {
     "error": "❌ خطا: {{message}}",
     "generic_error": "⚠️ خطایی رخ داد. لطفاً بعداً دوباره تلاش کنید.",
-    "loading": "⏳ در حال بارگذاری...",
-    "denied": "⛔️ دسترسی ندارید.",
-    "owner_only": "⛔️ این دستور فقط برای مالک ربات است.",
-    "back": "↩️ بازگشت",
-    "cancel": "لغو",
-    "confirm": "تأیید",
+    "player_fallback": "بازیکن",
+    "rank": "#",
     "clan": "کلن",
     "stars": "ستاره",
     "destruction": "تخریب",
-    "player": "بازیکن",
-    "attack": "حمله",
-    "defense": "دفاع",
-    "status": "وضعیت",
-    "opponent": "حریف",
-    "our_clan": "کلن ما",
-    "members": "اعضا",
-    "war_members": "اعضای وار",
-    "enemy_members": "اعضای حریف",
-    "th": "TH",
-    "rank": "#",
-    "player_fallback": "بازیکن"
+    "opponent": "حریف"
   },
   "lang": {
-    "fa": "فارسی",
-    "en": "English",
     "name": {
       "fa": "🇮🇷 فارسی",
       "en": "🇬🇧 English"
     }
   },
-  "settings": {
-    "title_group": "⚙️ تنظیمات گروه",
-    "title_private": "⚙️ تنظیمات شخصی",
-    "menu_language": "🌐 زبان | Language",
-    "current_language": "زبان فعلی: <b>{{language}}</b>",
-    "choose_language": "زبان مورد نظر را انتخاب کنید:",
-    "saved": "✅ زبان ذخیره شد: <b>{{language}}</b>",
-    "denied": "⛔️ فقط ادمین‌های گروه و مالک ربات می‌توانند تنظیمات را تغییر دهند.",
-    "private_only_self": "فقط می‌توانید تنظیمات حساب خودتان را تغییر دهید.",
-    "open_failed": "⚠️ باز کردن پنل تنظیمات ممکن نشد."
+  "loading": {
+    "default": "⏳ در حال دریافت اطلاعات...",
+    "war": "⏳ در حال دریافت وضعیت وار...",
+    "cwl": "⏳ در حال دریافت وضعیت CWL...",
+    "clan": "⏳ در حال دریافت اطلاعات کلن..."
+  },
+  "rate": {
+    "war": "⏳ تعداد درخواست‌های /war زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید.",
+    "cwl": "⏳ تعداد درخواست‌های /cwl زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید.",
+    "clan": "⏳ تعداد درخواست‌های /clan زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید."
   },
   "start": {
-    "message": "سلام 👋\n\nمن ربات مدیریت وار کلن Clash of Clans هستم.\n\n🔹 قابلیت‌ها:\n• پایش خودکار وار معمولی و لیگ کلن‌ها (CWL)\n• اعلان شروع/پایان نبرد و ۱ ساعت مانده\n• در CWL فقط یک اعلان آماده‌سازی در شروع لیگ\n• لینک اکانت کلش به تلگرام\n• /war برای وار معمولی و /cwl برای لیگ\n\nاز /help برای دیدن دستورات استفاده کن.\nاز /setting برای تغییر زبان استفاده کن."
+    "message": "سلام 👋\n\nمن ربات مدیریت وار کلن هستم؛ کنار کلن می‌مونم و وضعیت جنگ‌ها رو پیگیری می‌کنم.\n\n🔍 وار معمولی و لیگ کلن‌ها (CWL) رو خودکار پایش می‌کنم\n📣 شروع نبرد، پایان و ۱ ساعت مانده رو تو گروه اعلام می‌کنم\n📋 وضعیت اعضا، حمله و دفاع رو با دستورات نشون می‌دم\n🔗 اکانت کلش رو به تلگرام وصل می‌کنم تا منشن و پیگیری راحت‌تر بشه\n\nدستورات: /help\nزبان: /setting"
   },
   "help": {
-    "public": "🤖 <b>راهنمای ربات مدیریت وار</b>\n\n<b>دستورات</b>\n/war — وضعیت وار معمولی\n/cwl — وضعیت لیگ کلن‌ها (CWL)\n/clan — اطلاعات کلن\n/help — همین راهنما\n/setting — تنظیمات زبان\n\n<b>اکانت‌ها</b>\n/link #TAG — لینک اکانت کلش به تلگرام\n/unlink #TAG — حذف لینک\n/unlinkall — حذف همه لینک‌های شما\n/myaccounts — فهرست اکانت‌های لینک‌شده\n\n<b>نکته</b>\nدر لیگ کلن‌ها از /cwl استفاده کنید.\nاگر /war بزنید و کلن در CWL باشد، ربات شما را راهنمایی می‌کند.",
-    "owner": "🤖 <b>راهنمای ربات — Owner</b>\n\n<b>عمومی</b>\n/war · /cwl · /clan · /help · /setting\n/link #TAG · /unlink #TAG · /unlinkall · /myaccounts\n\n<b>مدیریت لینک دیگران</b>\n<code>/link TELEGRAM_USER_ID #TAG</code>\n<code>/unlink TELEGRAM_USER_ID #TAG</code>\n\n<b>ابزار اونر</b>\n/status — وضعیت فنی ربات\n/testnotify — تست ارسال به گروه\n/testlog — تست کانال لاگ\n/testw — پیش‌نمایش Widget\n\n<b>نکته</b>\nنوتیف‌های وار/CWL خودکار به گروه می‌روند."
+    "user": "📖 <b>راهنمای ربات</b>\n\n/war — وضعیت وار معمولی\n/cwl — وضعیت لیگ کلن‌ها\n/clan — اطلاعات کلن\n/link #TAG — لینک اکانت کلش\n/unlink #TAG — حذف لینک\n/myaccounts — اکانت‌های لینک‌شده\n/setting — تنظیمات زبان\n/help — همین راهنما",
+    "owner": "📖 <b>راهنمای مالک ربات</b>\n\nهمه دستورات کاربر:\n/war /cwl /clan /link /unlink /myaccounts /setting\n\nدستورات مالک:\n/status — وضعیت فنی ربات\n/testnotify — تست اعلان گروه\n/testlog — تست کانال لاگ\n/testw — پیش‌نمایش ویجت\n/link TELEGRAM_ID #TAG — لینک برای دیگران\n/unlinkall — حذف همه لینک‌های خودتان\n\n/help — همین راهنما"
+  },
+  "settings": {
+    "title": "⚙️ تنظیمات",
+    "language": "🌐 زبان",
+    "current_lang": "زبان فعلی: {{lang}}",
+    "choose_lang": "زبان را انتخاب کنید:",
+    "back": "◀️ بازگشت",
+    "admin_only": "⛔ فقط ادمین‌های گروه و مالک ربات می‌توانند تنظیمات گروه را تغییر دهند.",
+    "saved": "✅ زبان ذخیره شد."
   },
   "link": {
-    "usage": "استفاده:\n/link #CLASH_TAG\nیا (اونر):\n/link TELEGRAM_USER_ID #CLASH_TAG",
-    "owner_only_others": "❌ فقط اونر ربات می‌تواند اکانت دیگران را لینک کند.",
-    "invalid_telegram_id": "❌ شناسه تلگرام نامعتبر است.",
-    "already": "ℹ️ این اکانت قبلاً لینک شده است: {{tag}}{{name}}",
-    "success_self": "✅ اکانت {{tag}}{{name}} با موفقیت به حساب شما لینک شد.",
-    "success_other": "✅ اکانت {{tag}}{{name}} با موفقیت به کاربر {{userId}} لینک شد."
+    "usage": "استفاده:\n<code>/link #TAG</code>\nمالک:\n<code>/link TELEGRAM_ID #TAG</code>",
+    "owner_only_others": "⛔ فقط مالک ربات می‌تواند اکانت دیگران را لینک کند.",
+    "invalid_telegram_id": "❌ آیدی تلگرام نامعتبر است.",
+    "already": "ℹ️ این اکانت از قبل لینک شده است: <code>{{tag}}</code>{{name}}",
+    "success_self": "✅ اکانت لینک شد: <code>{{tag}}</code>{{name}}",
+    "success_other": "✅ اکانت <code>{{tag}}</code>{{name}} برای کاربر <code>{{userId}}</code> لینک شد."
+  },
+  "link_errors": {
+    "invalid_tag": "تگ کلش نامعتبر است. مثال صحیح: #ABC123XYZ",
+    "not_found": "اکانت کلش با این تگ پیدا نشد."
   },
   "unlink": {
-    "usage": "استفاده:\n/unlink #CLASH_TAG\nیا (اونر):\n/unlink TELEGRAM_USER_ID #CLASH_TAG",
-    "owner_only_others": "❌ فقط اونر می‌تواند لینک دیگران را حذف کند.",
-    "invalid_telegram_id": "❌ شناسه تلگرام نامعتبر است.",
-    "not_found": "ℹ️ لینکی برای {{tag}} پیدا نشد.",
-    "success": "✅ لینک {{tag}} حذف شد."
+    "usage": "استفاده: <code>/unlink #TAG</code>",
+    "success": "✅ لینک حذف شد: <code>{{tag}}</code>",
+    "not_found": "❌ لینکی با این تگ برای شما پیدا نشد."
   },
   "unlinkall": {
-    "confirm_prompt": "⚠️ آیا مطمئنید همهٔ اکانت‌های لینک‌شده‌تان حذف شود؟\nاین کار قابل برگشت نیست.",
-    "confirm_btn": "تأیید حذف",
-    "cancel_btn": "لغو",
-    "none": "ℹ️ هیچ اکانتی لینک نشده بود.",
-    "success": "✅ تمام لینک‌های شما حذف شد:\n{{list}}",
-    "cancelled": "❎ حذف همه لینک‌ها لغو شد.",
-    "not_yours": "این دکمه برای شما نیست."
+    "confirm": "⚠️ همه لینک‌های اکانت شما حذف می‌شوند. مطمئنید؟",
+    "yes": "✅ تأیید",
+    "no": "❌ لغو",
+    "done": "✅ همه لینک‌ها حذف شدند ({{count}}).",
+    "cancelled": "لغو شد.",
+    "empty": "لینکی برای حذف وجود ندارد."
   },
   "myaccounts": {
-    "empty": "ℹ️ هیچ اکانتی لینک نکرده‌اید.\nبا /link #TAG لینک کنید.",
-    "title": "🎮 اکانت‌های لینک‌شده شما:\n{{list}}"
+    "empty": "هنوز اکانتی لینک نکرده‌اید.\nبا <code>/link #TAG</code> شروع کنید.",
+    "title": "🎮 اکانت‌های لینک‌شده شما:"
   },
   "war": {
-    "not_in_war": "در حال حاضر کلن در وار نیست.",
-    "use_cwl": "کلن الان در لیگ کلن‌ها (CWL) است.\nاز دستور /cwl استفاده کنید.",
     "title": "⚔️ وضعیت وار",
-    "enemy_title": "⚡ تیم حریف",
-    "attacks_line": "⚔️ حمله‌ها: <b>{{used}}/{{max}}</b>",
+    "enemy_title": "⚔️ حریف وار",
+    "not_in_war": "در حال حاضر کلن در وار نیست.",
+    "use_cwl": "کلن در لیگ کلن‌هاست.\nاز دستور /cwl استفاده کنید.",
+    "fetch_error": "❌ خطا در دریافت اطلاعات وار: {{message}}",
     "start_time": "🕐 شروع نبرد: <b>{{time}}</b>",
-    "end_time": "🕐 پایان وار: <b>{{time}}</b>",
-    "team_size": "👥 {{size}}v{{size}}",
-    "state_line": "⏳ وضعیت: <b>{{state}}</b>",
-    "members_heading": "📋 اعضای وار",
-    "enemy_heading": "📋 اعضای حریف",
-    "enemy_missing": "اطلاعات اعضای حریف در دسترس نیست.",
-    "btn_enemy": "👁 Enemy",
-    "btn_back": "↩️ Back",
-    "btn_standings": "🏆 جدول",
-    "rich_unsupported": "⚠️ نسخه فعلی کلاینت تلگرام از Rich Message پشتیبانی نمی‌کند.\nلطفاً تلگرام را آپدیت کنید.",
-    "fetch_error": "❌ خطا در دریافت اطلاعات وار: {{message}}"
+    "end_time": "🕐 پایان نبرد: <b>{{time}}</b>",
+    "members": "📋 اعضای وار",
+    "btn_enemy": "Enemy",
+    "btn_home": "Home",
+    "btn_standings": "Standings",
+    "col_rank": "#",
+    "col_player": "بازیکن",
+    "col_atk": "حمله",
+    "col_stars": "ستاره",
+    "col_def": "دفاع",
+    "col_th": "TH",
+    "state_prep": "آماده‌سازی",
+    "state_inwar": "در حال جنگ",
+    "state_ended": "پایان یافته",
+    "state_unknown": "نامشخص"
   },
   "cwl": {
-    "not_in_cwl": "کلن الان در لیگ کلن‌ها نیست.\nبرای وار معمولی از /war استفاده کنید.",
-    "title": "⚔️ وضعیت وار",
-    "standings_title": "🏆 جدول لیگ کلن‌ها",
-    "standings_empty": "اطلاعات جدول در دسترس نیست.",
-    "season": "📅 فصل: <b>{{season}}</b>",
-    "standings_note": "رتبه‌بندی بر اساس ستاره (شامل +۱۰ برد)، سپس تخریب.",
-    "standings_cache": "کش تا حدود ۱۰ دقیقه — برای کم‌کردن فشار API.",
-    "day_label": "روز {{day}} از {{total}}",
-    "day_line": "📅 <b>{{dayLabel}}</b> لیگ کلن‌ها"
+    "title": "⚔️ وضعیت لیگ کلن‌ها",
+    "not_in_cwl": "کلن الان در لیگ کلن‌ها نیست.",
+    "day": "روز {{day}} از {{total}}",
+    "season": "📅 فصل: <b>{{season}}</b>"
   },
   "clan": {
-    "fetch_error": "❌ خطا در دریافت اطلاعات کلن: {{message}}",
     "title_status": "📊 وضعیت کلن",
     "title_war": "⚔️ جنگ و لیگ",
     "col_item": "مورد",
@@ -134,7 +125,7 @@
     "log_public": "عمومی",
     "log_private": "خصوصی",
     "type_open": "باز",
-    "type_invite": "فقط با دعوت",
+    "type_invite": "دعوتی",
     "type_closed": "بسته",
     "freq_always": "همیشه",
     "freq_moreThanOncePerWeek": "بیش از هفته‌ای یک‌بار",
@@ -142,64 +133,24 @@
     "freq_lessThanOncePerWeek": "کمتر از هفته‌ای یک‌بار",
     "freq_never": "هرگز",
     "freq_unknown": "نامشخص",
-    "unknown": "نامشخص"
-  },
-  "state": {
-    "notInWar": "خارج از وار",
-    "preparation": "آماده‌سازی",
-    "inWar": "در حال نبرد",
-    "warEnded": "پایان یافته",
-    "unknown": "نامشخص"
-  },
-  "result": {
-    "win": "🏆 برد",
-    "lose": "❌ باخت",
-    "tie": "🤝 مساوی"
-  },
-  "time": {
-    "today": "امروز ساعت {{time}}",
-    "tomorrow": "فردا ساعت {{time}}",
-    "weekday": "{{weekday}} ساعت {{time}}"
+    "fetch_error": "❌ خطا در دریافت اطلاعات کلن: {{message}}"
   },
   "notify": {
-    "prep_title": "⚔️ حریف پیدا شد — آماده‌سازی شروع شد!",
+    "prep_title": "⚔️ حریف وار پیدا شد!",
     "cwl_league_start": "🏟 لیگ کلن‌ها شروع شد — آماده‌سازی روز اول",
     "battle_start": "🔥 روز نبرد شروع شد!",
     "battle_start_cwl": "🔥 روز نبرد شروع شد! (CWL)",
-    "one_hour": "⏰ ۱ ساعت تا پایان وار",
-    "one_hour_cwl": "⏰ ۱ ساعت تا پایان وار (CWL)",
     "war_ended": "🏁 وار به پایان رسید!",
-    "war_ended_cwl": "🏁 وار به پایان رسید! (CWL)",
-    "offline_note": "ربات هنگام پایان آفلاین بود؛ نتیجه از آخرین وضعیت ذخیره‌شده:",
-    "result_line": "نتیجه: <b>{{result}}</b>",
-    "pending_all_done": "✅ همه اعضا حمله‌های خود را انجام داده‌اند.",
-    "pending_all_stars": "✅ همه ستاره‌ها گرفته شده است.",
-    "pending_count": "⚠️ حمله باقی‌مانده: <b>{{count}}</b> نفر",
-    "pending_footer": "حمله‌هاتون رو فراموش نکنید.",
-    "mentions": "📣 منشن‌ها: {{list}}",
-    "fallback_plain": "War notice (client does not support Rich Message)",
+    "war_ended_cwl": "🏁 روز لیگ به پایان رسید!",
+    "one_hour": "⏰ ۱ ساعت به پایان نبرد مانده",
+    "pending_title": "هنوز حمله نکرده‌اند:",
     "league_ended_title": "🏁 لیگ کلن‌ها به پایان رسید!",
     "league_final": "🏟 نتیجه نهایی گروه",
     "league_rank": "🏅 رتبه کلن ما: <b>{{rank}} از {{total}}</b><br/>⭐ مجموع ستاره: <b>{{stars}}</b><br/>🏆 تعداد برد: <b>{{wins}}</b>",
     "thanks_all": "💚 از همه اعضای کلن بابت تلاش این فصل ممنونیم.",
+    "thanks_unlinked": "⭐ این فصل چند نفر حداقل {{min}} ستاره گرفتند؛ برای منشن شدن اکانت‌شان را به ربات لینک کنند.",
     "thanks_special": "⭐ با تشکر ویژه از کسانی که حداقل <b>{{min}}</b> ستاره گرفتند:<br/>{{list}}",
     "thanks_rest": "💚 و از بقیه اعضای کلن هم بابت همراهی این فصل ممنونیم.",
-    "thanks_unlinked": "⭐ این فصل چند نفر حداقل {{min}} ستاره گرفتند؛ برای منشن شدن اکانت‌شان را به ربات لینک کنند.",
     "good_job": "خسته نباشید 💪"
-  },
-  "rate": {
-    "war": "⏳ تعداد درخواست‌های /war زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر دوباره تلاش کنید.",
-    "cwl": "⏳ تعداد درخواست‌های /cwl زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر دوباره تلاش کنید.",
-    "clan": "⏳ تعداد درخواست‌های /clan زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید."
-  },
-  "loading": {
-    "default": "⏳ در حال دریافت اطلاعات...",
-    "war": "⏳ در حال دریافت وضعیت وار...",
-    "cwl": "⏳ در حال دریافت وضعیت CWL...",
-    "clan": "⏳ در حال دریافت اطلاعات کلن..."
-  },
-  "link_errors": {
-    "invalid_tag": "تگ کلش نامعتبر است. مثال صحیح: #ABC123XYZ",
-    "not_found": "اکانت کلش با این تگ پیدا نشد."
   }
 }
