@@ -24,6 +24,7 @@ const {
   cwlStandingsAction,
 } = cwlCommand;
 const clanCommand = require('../commands/clan');
+const reportCommand = require('../commands/report');
 const statusCommand = require('../commands/status');
 const testNotifyCommand = require('../commands/testnotify');
 const testLogCommand = require('../commands/testlog');
@@ -67,6 +68,7 @@ function createBot() {
   bot.action('cwl:home', cwlHomeAction);
   bot.action('cwl:standings', cwlStandingsAction);
   bot.command('clan', clanCommand);
+  bot.command('report', reportCommand);
   bot.command('status', statusCommand);
   bot.command('testnotify', testNotifyCommand);
   bot.command('testlog', testLogCommand);

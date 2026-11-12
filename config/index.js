@@ -1,8 +1,6 @@
-require('dotenv').config();
-
 function requireEnv(name) {
   const value = process.env[name];
-  if (!value || value.trim() === '') {
+  if (value == null || String(value).trim() === '') {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value.trim();
@@ -27,13 +25,11 @@ const config = {
     : null,
   clanTag: (process.env.CLAN_TAG || '').replace(/^#/, '').toUpperCase(),
 
-  // Backward-compatible base interval (also used as "active" default)
   warPollIntervalMs: intEnv('WAR_POLL_INTERVAL_MS', 120000),
 
-  // Adaptive polling
-  warPollIdleMs: intEnv('WAR_POLL_IDLE_MS', 300000), // not in war
-  warPollActiveMs: intEnv('WAR_POLL_ACTIVE_MS', 0), // 0 = use WAR_POLL_INTERVAL_MS
-  warPollNearMs: intEnv('WAR_POLL_NEAR_MS', 30000), // near start / 1h left / end
+  warPollIdleMs: intEnv('WAR_POLL_IDLE_MS', 300000),
+  warPollActiveMs: intEnv('WAR_POLL_ACTIVE_MS', 0),
+  warPollNearMs: intEnv('WAR_POLL_NEAR_MS', 30000),
   warPollMinMs: intEnv('WAR_POLL_MIN_MS', 20000),
 
   logTelegramId: process.env.LOG_TELEGRAM_ID
@@ -55,6 +51,8 @@ const config = {
   clashMaxRetries: intEnv('CLASH_MAX_RETRIES', 3),
   clashApiTimeoutMs: intEnv('CLASH_API_TIMEOUT_MS', 15000),
   telegramMaxRetries: intEnv('TELEGRAM_MAX_RETRIES', 3),
+
+  statsRetentionMonths: intEnv('STATS_RETENTION_MONTHS', 6),
 };
 
 if (!config.clanTag) {
