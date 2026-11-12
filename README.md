@@ -74,7 +74,6 @@ In CWL, preparation alerts fire only at league start (not every day).
 | `/status` | Technical status (DB, API, poll, links) |
 | `/testnotify` | Send a test message to `TELEGRAM_GROUP_ID` |
 | `/testlog` | Send a test line to the log channel |
-| `/testw` | Experimental war widget preview |
 | `/link USER_ID #TAG` | Link a tag for another user |
 | `/unlinkall` | Remove all of your own links (with confirm) |
 
@@ -268,7 +267,6 @@ MIT
 | `/status` | وضعیت فنی (دیتابیس، API، پول، لینک‌ها) |
 | `/testnotify` | پیام تست به گروه |
 | `/testlog` | خط تست به کانال لاگ |
-| `/testw` | پیش‌نمایش ویجت وار |
 | `/link USER_ID #TAG` | لینک برای کاربر دیگر |
 | `/unlinkall` | حذف همه لینک‌های خودتان (با تأیید) |
 
