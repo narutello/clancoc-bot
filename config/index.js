@@ -1,7 +1,31 @@
+try {
+  require('dotenv').config();
+} catch (_) {
+  // optional dependency path; process.env from host is still used
+}
+
 function requireEnv(name) {
   const value = process.env[name];
   if (value == null || String(value).trim() === '') {
-    throw new Error(`Missing required environment variable: ${name}`);
+    const related = Object.keys(process.env)
+      .filter((k) => {
+        const u = k.toUpperCase();
+        return (
+          u === name ||
+          u.includes('BOT') ||
+          u.includes('TOKEN') ||
+          u.includes('DATABASE') ||
+          u.includes('CLAN')
+        );
+      })
+      .sort()
+      .join(', ');
+    throw new Error(
+      `Missing required environment variable: ${name}` +
+        (related
+          ? ` | env keys visible to process: ${related}`
+          : ' | process.env has no BOT/TOKEN/DATABASE/CLAN keys (host is not injecting env)')
+    );
   }
   return value.trim();
 }
