@@ -1,7 +1,7 @@
 {
   "name": "clancoc-bot",
   "version": "1.0.0",
-  "description": "Professional Telegram bot for Clash of Clans war management",
+  "description": "Telegram bot for Clash of Clans clan war and CWL management",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -17,12 +17,23 @@
     "telegraf": "^4.16.3"
   },
   "keywords": [
-    "telegram",
-    "bot",
+    "telegram-bot",
     "clash-of-clans",
+    "cwl",
     "war",
-    "cwl"
+    "nodejs",
+    "telegraf",
+    "postgresql",
+    "i18n"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/narutello/clancoc-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/narutello/clancoc-bot/issues"
+  },
+  "homepage": "https://github.com/narutello/clancoc-bot#readme",
   "author": "Sajad",
   "license": "MIT"
 }
