@@ -7,7 +7,12 @@
     "clan": "Clan",
     "stars": "Stars",
     "destruction": "Destruction",
-    "opponent": "Enemy"
+    "opponent": "Enemy",
+    "player": "Player",
+    "th": "TH",
+    "attack": "Atk",
+    "defense": "Def",
+    "our_clan": "Our clan"
   },
   "lang": {
     "name": {
@@ -84,16 +89,21 @@
     "btn_enemy": "Enemy",
     "btn_home": "Home",
     "btn_standings": "Standings",
-    "col_rank": "#",
-    "col_player": "Player",
     "col_atk": "Atk",
-    "col_stars": "Stars",
     "col_def": "Def",
+    "col_player": "Player",
+    "col_rank": "#",
+    "col_stars": "Stars",
     "col_th": "TH",
-    "state_prep": "Preparation",
-    "state_inwar": "In war",
     "state_ended": "Ended",
-    "state_unknown": "Unknown"
+    "state_inwar": "In war",
+    "state_prep": "Preparation",
+    "state_unknown": "Unknown",
+    "team_size": "👥 {{size}}v{{size}}",
+    "state_line": "⏳ Status: {{state}}",
+    "attacks_line": "⚔️ Attacks: {{used}}/{{max}}",
+    "members_heading": "📋 War members",
+    "btn_back": "Back"
   },
   "cwl": {
     "title": "⚔️ CWL status",
@@ -152,7 +162,10 @@
     "thanks_unlinked": "⭐ Several players scored at least {{min}} stars this season; link their accounts to get mentioned.",
     "thanks_special": "⭐ Special thanks to those with at least <b>{{min}}</b> stars:<br/>{{list}}",
     "thanks_rest": "💚 And thanks to the rest of the clan for the season.",
-    "good_job": "Well done 💪"
+    "good_job": "Well done 💪",
+    "result_line": "Result: <b>{{result}}</b>",
+    "offline_note": "Bot was offline at war end; status restored from last known data.",
+    "pending_all_done": "Everyone has attacked ✅"
   },
   "report": {
     "title": "📊 Clan report — {{month}}",
@@ -171,5 +184,22 @@
     "footer": "Data is stored from wars the bot observed · month in Tehran time",
     "invalid_month": "Invalid month format. Example: <code>/report 2026-11</code>",
     "error": "❌ Failed to build report: {{message}}"
+  },
+  "time": {
+    "today": "today at {{time}}",
+    "tomorrow": "tomorrow at {{time}}",
+    "weekday": "{{weekday}} at {{time}}"
+  },
+  "state": {
+    "preparation": "Preparation",
+    "inWar": "In war",
+    "warEnded": "Ended",
+    "notInWar": "Not in war",
+    "unknown": "Unknown"
+  },
+  "result": {
+    "win": "Win",
+    "lose": "Loss",
+    "tie": "Tie"
   }
 }

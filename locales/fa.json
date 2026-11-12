@@ -7,7 +7,12 @@
     "clan": "کلن",
     "stars": "ستاره",
     "destruction": "تخریب",
-    "opponent": "حریف"
+    "opponent": "حریف",
+    "player": "بازیکن",
+    "th": "TH",
+    "attack": "حمله",
+    "defense": "دفاع",
+    "our_clan": "کلن ما"
   },
   "lang": {
     "name": {
@@ -84,16 +89,21 @@
     "btn_enemy": "Enemy",
     "btn_home": "Home",
     "btn_standings": "Standings",
-    "col_rank": "#",
-    "col_player": "بازیکن",
     "col_atk": "حمله",
-    "col_stars": "ستاره",
     "col_def": "دفاع",
+    "col_player": "بازیکن",
+    "col_rank": "#",
+    "col_stars": "ستاره",
     "col_th": "TH",
-    "state_prep": "آماده‌سازی",
-    "state_inwar": "در حال جنگ",
     "state_ended": "پایان یافته",
-    "state_unknown": "نامشخص"
+    "state_inwar": "در حال جنگ",
+    "state_prep": "آماده‌سازی",
+    "state_unknown": "نامشخص",
+    "team_size": "👥 {{size}}v{{size}}",
+    "state_line": "⏳ وضعیت: {{state}}",
+    "attacks_line": "⚔️ حمله‌ها: {{used}}/{{max}}",
+    "members_heading": "📋 اعضای وار",
+    "btn_back": "بازگشت"
   },
   "cwl": {
     "title": "⚔️ وضعیت لیگ کلن‌ها",
@@ -152,7 +162,10 @@
     "thanks_unlinked": "⭐ این فصل چند نفر حداقل {{min}} ستاره گرفتند؛ برای منشن شدن اکانت‌شان را به ربات لینک کنند.",
     "thanks_special": "⭐ با تشکر ویژه از کسانی که حداقل <b>{{min}}</b> ستاره گرفتند:<br/>{{list}}",
     "thanks_rest": "💚 و از بقیه اعضای کلن هم بابت همراهی این فصل ممنونیم.",
-    "good_job": "خسته نباشید 💪"
+    "good_job": "خسته نباشید 💪",
+    "result_line": "نتیجه: <b>{{result}}</b>",
+    "offline_note": "ربات هنگام پایان آفلاین بود؛ وضعیت از آخرین داده بازیابی شد.",
+    "pending_all_done": "همه حمله کرده‌اند ✅"
   },
   "report": {
     "title": "📊 گزارش کلن — {{month}}",
@@ -171,5 +184,22 @@
     "footer": "داده‌ها از وارهایی که ربات دیده ذخیره شده‌اند · ماه به وقت تهران",
     "invalid_month": "فرمت ماه نامعتبر است. مثال: <code>/report 2026-11</code>",
     "error": "❌ خطا در ساخت گزارش: {{message}}"
+  },
+  "time": {
+    "today": "امروز ساعت {{time}}",
+    "tomorrow": "فردا ساعت {{time}}",
+    "weekday": "{{weekday}} ساعت {{time}}"
+  },
+  "state": {
+    "preparation": "آماده‌سازی",
+    "inWar": "در حال جنگ",
+    "warEnded": "پایان یافته",
+    "notInWar": "خارج از وار",
+    "unknown": "نامشخص"
+  },
+  "result": {
+    "win": "برد",
+    "lose": "باخت",
+    "tie": "مساوی"
   }
 }
