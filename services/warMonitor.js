@@ -28,6 +28,11 @@ const {
   markPollError,
   markNextPoll,
 } = require('./monitorStats');
+const {
+  recordFinishedWar,
+  recordFinishedWarFromSaved,
+  runStatsMaintenance,
+} = require('./statsService');
 
 let lastLoggedWarState = null;
 let monitorTimer = null;
@@ -51,12 +56,6 @@ function clampPollMs(ms) {
   return Math.min(max, Math.max(min, Math.floor(n)));
 }
 
-/**
- * Adaptive interval:
- * - idle when not in war
- * - faster near battle start, 1h-left window, and war end
- * - normal active otherwise
- */
 function computeNextInterval(war) {
   const idle = config.warPollIdleMs || 300000;
   const active = config.warPollActiveMs || config.warPollIntervalMs || 120000;
@@ -79,9 +78,6 @@ function computeNextInterval(war) {
       if (msToStart <= 20 * 60 * 1000) {
         return { ms: clampPollMs(near), reason: 'prep_near_start' };
       }
-      if (msToStart <= 2 * 60 * 60 * 1000) {
-        return { ms: clampPollMs(active), reason: 'prep_within_2h' };
-      }
     }
     return { ms: clampPollMs(active), reason: 'preparation' };
   }
@@ -93,7 +89,6 @@ function computeNextInterval(war) {
       if (msToEnd <= 0) {
         return { ms: clampPollMs(near), reason: 'inwar_should_have_ended' };
       }
-      // Around the 1-hour-left notification window (50–75 min left)
       if (msToEnd >= 50 * 60 * 1000 && msToEnd <= 75 * 60 * 1000) {
         return { ms: clampPollMs(near), reason: 'inwar_one_hour_window' };
       }
@@ -127,6 +122,7 @@ async function checkRegularWar(bot) {
   if (!war || war.state === 'notInWar') {
     if (last && !last.is_cwl && last.state && last.state !== 'notInWar') {
       await notifyWarEndedFromSaved(bot, last, false);
+      await recordFinishedWarFromSaved(last, false);
       await saveState({
         state: 'notInWar',
         isCwl: false,
@@ -152,7 +148,10 @@ async function checkRegularWar(bot) {
     await notifyBattleStart(bot, war, false);
     await notifyOneHourLeft(bot, war, false);
   }
-  if (war.state === 'warEnded') await notifyWarEnded(bot, war, false);
+  if (war.state === 'warEnded') {
+    await notifyWarEnded(bot, war, false);
+    await recordFinishedWar(war, { isCwl: false });
+  }
   await saveState({
     state: war.state,
     warTag: war.tag || null,
@@ -193,6 +192,7 @@ async function checkCwl(bot) {
       last.state !== 'warEnded'
     ) {
       await notifyWarEndedFromSaved(bot, last, true);
+      await recordFinishedWarFromSaved(last, true);
     }
     return null;
   }
@@ -225,10 +225,12 @@ async function checkCwl(bot) {
 
     if (lastWasActive || recentlyEnded) {
       await notifyWarEnded(bot, war, true);
+      await recordFinishedWar(war, { isCwl: true });
     } else {
       console.log(
         `[WarMonitor] Skip stale CWL warEnded notify (day ${meta.cwlDay}, last=${last?.state || 'none'}, is_cwl=${last?.is_cwl ? 1 : 0})`
       );
+      await recordFinishedWar(war, { isCwl: true });
       await tgLog.debug(
         'Skipped stale CWL warEnded notify',
         {
@@ -269,6 +271,7 @@ async function checkCwl(bot) {
     theirStars: war.opponent?.stars,
     ourDestruction: war.clan?.destructionPercentage,
     theirDestruction: war.opponent?.destructionPercentage,
+    membersJson: extractMembers(war),
   });
   return war;
 }
@@ -295,6 +298,12 @@ async function checkWarStatus(bot) {
       cwlTotalDays: cwlWar?.__cwlMeta?.cwlTotalDays || null,
     });
 
+    try {
+      await runStatsMaintenance(bot);
+    } catch (err) {
+      console.warn('[WarMonitor] stats maintenance:', err.message);
+    }
+
     console.log(`[WarMonitor] Check done — state=${state} opponent=${opp}`);
     await tgLog.debug(
       `War poll OK — state=${state}`,
@@ -304,92 +313,56 @@ async function checkWarStatus(bot) {
     if (state !== lastLoggedWarState) {
       lastLoggedWarState = state;
       await tgLog.info(
-        `War state changed → ${state}`,
+        `War state → ${state}`,
         { opponent: String(opp).slice(0, 80), cwl: isCwl },
         { module: 'WarMonitor' }
       );
     }
+
+    const interval = computeNextInterval(
+      active && active.state ? active : { state: 'notInWar' }
+    );
+    markNextPoll(interval.ms, interval.reason);
+    return { war: active, interval };
   } catch (err) {
     markPollError(err);
-    console.error('[WarMonitor] Error during check:', err.message);
-    console.error(err.stack);
+    console.error('[WarMonitor] Check failed:', err.message);
     await tgLog.error('War check failed', err.stack || err.message, {
       module: 'WarMonitor',
     });
+    const interval = {
+      ms: clampPollMs(config.warPollActiveMs || 120000),
+      reason: 'error_backoff',
+    };
+    markNextPoll(interval.ms, interval.reason);
+    return { war: lastActiveWar, interval };
   }
 }
 
-function scheduleNext(bot) {
+function scheduleNext(bot, ms) {
   if (monitorStopped) return;
-  if (monitorTimer) {
-    clearTimeout(monitorTimer);
-    monitorTimer = null;
-  }
-
-  const { ms, reason } = computeNextInterval(lastActiveWar);
-  markNextPoll(ms, reason);
-  console.log(
-    `[WarMonitor] Next poll in ${Math.round(ms / 1000)}s (${reason})`
-  );
-
+  if (monitorTimer) clearTimeout(monitorTimer);
   monitorTimer = setTimeout(async () => {
-    await checkWarStatus(bot);
-    scheduleNext(bot);
+    const result = await checkWarStatus(bot);
+    const next = result?.interval?.ms || config.warPollActiveMs || 120000;
+    scheduleNext(bot, next);
   }, ms);
-
-  global.__warMonitorTimer = monitorTimer;
 }
 
 function startWarMonitor(bot) {
   monitorStopped = false;
-  if (monitorTimer) {
-    clearTimeout(monitorTimer);
-    monitorTimer = null;
-  }
-  if (global.__warMonitorInterval) {
-    clearInterval(global.__warMonitorInterval);
-    global.__warMonitorInterval = null;
-  }
-
-  console.log(
-    `[WarMonitor] Adaptive polling — idle=${config.warPollIdleMs}ms active=${config.warPollActiveMs}ms near=${config.warPollNearMs}ms`
-  );
-  tgLog.info(
-    `War monitor started (adaptive: idle ${config.warPollIdleMs}ms / active ${config.warPollActiveMs}ms / near ${config.warPollNearMs}ms)`,
-    null,
-    { module: 'WarMonitor' }
-  );
-
-  // First check soon after boot, then adaptive schedule
-  markNextPoll(5000, 'boot');
-  monitorTimer = setTimeout(async () => {
-    await checkWarStatus(bot);
-    scheduleNext(bot);
-  }, 5000);
-  global.__warMonitorTimer = monitorTimer;
-  return monitorTimer;
+  console.log('[WarMonitor] Starting adaptive war monitor...');
+  scheduleNext(bot, 3000);
 }
 
 function stopWarMonitor() {
   monitorStopped = true;
-  if (monitorTimer) {
-    clearTimeout(monitorTimer);
-    monitorTimer = null;
-  }
-}
-
-function formatMembersList(members) {
-  return (members || [])
-    .slice()
-    .sort((a, b) => (a.mapPosition || 0) - (b.mapPosition || 0))
-    .map((m, i) => `${i + 1}. ${m.name || m.tag}`)
-    .join('\n');
+  if (monitorTimer) clearTimeout(monitorTimer);
+  monitorTimer = null;
 }
 
 module.exports = {
   startWarMonitor,
   stopWarMonitor,
   checkWarStatus,
-  formatMembersList,
-  computeNextInterval,
 };
