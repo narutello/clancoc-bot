@@ -63,5 +63,27 @@
   },
   "unlinkall": {
     "cancelled": "Cancelled."
+  },
+  "report": {
+    "title": "📊 Clan performance report — {{month}}",
+    "auto_title": "📊 Monthly clan report ({{month}})",
+    "section_wars": "⚔️ War results",
+    "wars_count": "• Wars recorded: <b>{{total}}</b>",
+    "wars_results": "• Results: <b>{{wins}}</b> wins · <b>{{losses}}</b> losses · <b>{{ties}}</b> ties",
+    "cwl_line": "• CWL days recorded: <b>{{count}}</b>",
+    "stars_ours": "• Stars our clan scored: <b>{{stars}}</b> ⭐",
+    "stars_enemy": "• Stars opponents scored on us: <b>{{stars}}</b> ⭐",
+    "section_top_stars": "⭐ Players with the most stars",
+    "section_top_attacks": "🗡️ Players with the most attacks",
+    "player_stars_line": "{{rank}}. <b>{{name}}</b> — {{stars}} stars in {{wars}} wars",
+    "player_attacks_line": "{{rank}}. <b>{{name}}</b> — {{attacks}} attacks ({{stars}} stars)",
+    "player_donated_line": "{{rank}}. <b>{{name}}</b> — {{amount}} donated",
+    "player_received_line": "{{rank}}. <b>{{name}}</b> — {{amount}} received",
+    "section_donations": "📦 Member donations",
+    "top_donors": "Top donors:",
+    "top_received": "Top received:",
+    "donations_pending": "Not enough donation data for this month yet (usually ready after 1–2 days).",
+    "empty_wars": "No wars the bot observed are stored for this month yet.",
+    "footer": "📌 Only wars the bot observed are included · month in Tehran time"
   }
 }

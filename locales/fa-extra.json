@@ -8,7 +8,7 @@
     "fetch_error": "❌ خطا در دریافت اطلاعات کلن: {{message}}",
     "freq_always": "همیشه",
     "freq_lessThanOncePerWeek": "کمتر از هفته‌ای یک‌بار",
-    "freq_moreThanOncePerWeek": "بیش از از هفته‌ای یک‌بار",
+    "freq_moreThanOncePerWeek": "بیش از هفته‌ای یک‌بار",
     "freq_never": "هرگز",
     "freq_oncePerWeek": "هفته‌ای یک‌بار",
     "freq_unknown": "نامشخص",
@@ -63,5 +63,27 @@
   },
   "unlinkall": {
     "cancelled": "لغو شد."
+  },
+  "report": {
+    "title": "📊 گزارش عملکرد کلن — {{month}}",
+    "auto_title": "📊 گزارش ماهانه کلن ({{month}})",
+    "section_wars": "⚔️ نتیجه وارها",
+    "wars_count": "• تعداد وار ثبت‌شده: <b>{{total}}</b>",
+    "wars_results": "• نتیجه: <b>{{wins}}</b> برد · <b>{{losses}}</b> باخت · <b>{{ties}}</b> مساوی",
+    "cwl_line": "• روزهای لیگ (CWL) ثبت‌شده: <b>{{count}}</b>",
+    "stars_ours": "• ستاره‌هایی که کلن ما گرفته: <b>{{stars}}</b> ⭐",
+    "stars_enemy": "• ستاره‌هایی که حریف‌ها از ما گرفته‌اند: <b>{{stars}}</b> ⭐",
+    "section_top_stars": "⭐ بازیکنانی که بیشترین ستاره را گرفته‌اند",
+    "section_top_attacks": "🗡️ بازیکنانی که بیشترین حمله را زده‌اند",
+    "player_stars_line": "{{rank}}. <b>{{name}}</b> — {{stars}} ستاره در {{wars}} وار",
+    "player_attacks_line": "{{rank}}. <b>{{name}}</b> — {{attacks}} حمله ({{stars}} ستاره)",
+    "player_donated_line": "{{rank}}. <b>{{name}}</b> — {{amount}} دونیت",
+    "player_received_line": "{{rank}}. <b>{{name}}</b> — {{amount}} دریافت",
+    "section_donations": "📦 دونیت اعضا",
+    "top_donors": "بیشترین دونیت داده‌شده:",
+    "top_received": "بیشترین دونیت دریافت‌شده:",
+    "donations_pending": "هنوز داده کافی برای دونیت این ماه جمع نشده (معمولاً بعد از ۱–۲ روز آماده می‌شود).",
+    "empty_wars": "برای این ماه هنوز هیچ واری که ربات دیده باشد ثبت نشده است.",
+    "footer": "📌 فقط وارهایی که ربات دیده در این گزارش آمده‌اند · ماه بر اساس وقت تهران"
   }
 }
