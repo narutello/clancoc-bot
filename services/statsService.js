@@ -15,6 +15,7 @@ const {
   markNotification,
 } = require('./warState');
 const { t, DEFAULT_LANG } = require('../utils/i18n');
+const { formatReportText } = require('./reportFormat');
 const { tgLog } = require('../utils/telegramLogger');
 
 const SNAPSHOT_MIN_GAP_MS = 20 * 60 * 60 * 1000;
@@ -440,97 +441,6 @@ async function buildMonthlyReport(monthKey) {
     donations,
     warRows,
   };
-}
-
-function formatPlayerLine(row, value) {
-  const name = escapeHtml(
-    stripEmojis(row.player_name || row.name || row.tag || '—') || '—'
-  );
-  return `${name} — <b>${value}</b>`;
-}
-
-function formatReportText(report, lang = DEFAULT_LANG) {
-  const lines = [];
-  lines.push(t('report.title', { lng: lang, month: report.monthKey }));
-  lines.push('');
-  lines.push(t('report.section_wars', { lng: lang }));
-  lines.push(
-    t('report.wars_line', {
-      lng: lang,
-      total: report.wars,
-      wins: report.wins,
-      losses: report.losses,
-      ties: report.ties,
-    })
-  );
-  if (report.cwlCount > 0) {
-    lines.push(t('report.cwl_line', { lng: lang, count: report.cwlCount }));
-  }
-  lines.push(
-    t('report.stars_line', {
-      lng: lang,
-      for: report.starsFor,
-      against: report.starsAgainst,
-    })
-  );
-
-  if (!report.wars) {
-    lines.push('');
-    lines.push(t('report.empty_wars', { lng: lang }));
-  }
-
-  if (report.topStars.length) {
-    lines.push('');
-    lines.push(t('report.section_top_stars', { lng: lang }));
-    report.topStars.forEach((row, i) => {
-      lines.push(
-        `${i + 1}. ${formatPlayerLine(row, `${row.stars} ⭐ (${row.wars})`)}`
-      );
-    });
-  }
-
-  if (report.topAttacks.length) {
-    lines.push('');
-    lines.push(t('report.section_top_attacks', { lng: lang }));
-    report.topAttacks.forEach((row, i) => {
-      lines.push(
-        `${i + 1}. ${formatPlayerLine(row, `${row.attacks} (${row.stars} ⭐)`)}`
-      );
-    });
-  }
-
-  const don = report.donations;
-  if (don.samplePlayers > 0) {
-    lines.push('');
-    lines.push(t('report.section_donations', { lng: lang }));
-    if (don.byDonated.some((x) => x.donated > 0)) {
-      lines.push(t('report.top_donors', { lng: lang }));
-      don.byDonated
-        .filter((x) => x.donated > 0)
-        .slice(0, 5)
-        .forEach((row, i) => {
-          lines.push(`${i + 1}. ${formatPlayerLine(row, String(row.donated))}`);
-        });
-    } else {
-      lines.push(t('report.donations_pending', { lng: lang }));
-    }
-    if (don.byReceived.some((x) => x.received > 0)) {
-      lines.push(t('report.top_received', { lng: lang }));
-      don.byReceived
-        .filter((x) => x.received > 0)
-        .slice(0, 5)
-        .forEach((row, i) => {
-          lines.push(`${i + 1}. ${formatPlayerLine(row, String(row.received))}`);
-        });
-    }
-  } else {
-    lines.push('');
-    lines.push(t('report.donations_pending', { lng: lang }));
-  }
-
-  lines.push('');
-  lines.push(t('report.footer', { lng: lang }));
-  return lines.join('\n');
 }
 
 async function runRetention() {
