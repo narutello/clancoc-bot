@@ -17,5 +17,8 @@ module.exports = async function startCommand(ctx) {
     ? ctx.t('start.message')
     : 'Hi! Use /help and /setting.';
 
-  return ctx.reply(text);
+  return ctx.reply(text, {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  });
 };

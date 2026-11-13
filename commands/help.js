@@ -6,9 +6,8 @@ module.exports = async function helpCommand(ctx) {
   const isOwner =
     userId != null && Number.isFinite(ownerId) && Number(userId) === ownerId;
 
-  const text = isOwner
-    ? ctx.t('help.owner')
-    : ctx.t('help.public');
+  // Full help for members; extended help for owner
+  const text = isOwner ? ctx.t('help.owner') : ctx.t('help.user');
 
   return ctx.reply(text, {
     parse_mode: 'HTML',
