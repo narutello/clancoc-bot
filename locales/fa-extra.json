@@ -8,7 +8,7 @@
     "fetch_error": "❌ خطا در دریافت اطلاعات کلن: {{message}}",
     "freq_always": "همیشه",
     "freq_lessThanOncePerWeek": "کمتر از هفته‌ای یک‌بار",
-    "freq_moreThanOncePerWeek": "بیش از هفته‌ای یک‌بار",
+    "freq_moreThanOncePerWeek": "بیش از از هفته‌ای یک‌بار",
     "freq_never": "هرگز",
     "freq_oncePerWeek": "هفته‌ای یک‌بار",
     "freq_unknown": "نامشخص",
@@ -44,7 +44,7 @@
   },
   "myaccounts": {
     "empty": "هنوز اکانتی لینک نکرده‌اید.\nبا <code>/link #TAG</code> شروع کنید.",
-    "title": "🎮 اکانت‌های لینک‌شده شما:"
+    "title": "🎮 اکانت‌های لینک‌شده شما:\n\n{{list}}"
   },
   "notify": {
     "good_job": "خسته نباشید 💪",

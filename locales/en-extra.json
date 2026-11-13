@@ -44,7 +44,7 @@
   },
   "myaccounts": {
     "empty": "You have no linked accounts yet.\nStart with <code>/link #TAG</code>.",
-    "title": "🎮 Your linked accounts:"
+    "title": "🎮 Your linked accounts:\n\n{{list}}"
   },
   "notify": {
     "good_job": "Well done 💪",
