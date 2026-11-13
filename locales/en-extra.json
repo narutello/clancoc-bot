@@ -84,6 +84,13 @@
     "top_received": "Top received:",
     "donations_pending": "Not enough donation data for this month yet (usually ready after 1–2 days).",
     "empty_wars": "No wars the bot observed are stored for this month yet.",
-    "footer": "📌 Only wars the bot observed are included · month in Tehran time"
+    "footer": "📌 Only wars the bot observed are included · month in Tehran time",
+    "col_rank": "#",
+    "col_player": "Player",
+    "col_stars": "Stars",
+    "col_wars": "Wars",
+    "col_attacks": "Attacks",
+    "col_donated": "Donated",
+    "col_received": "Received"
   }
 }
