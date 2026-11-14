@@ -40,7 +40,21 @@
     "owner_only_others": "⛔ Only the bot owner can link accounts for others.",
     "success_other": "✅ Account <code>{{tag}}</code>{{name}} linked for user <code>{{userId}}</code>.",
     "success_self": "✅ Account linked: <code>{{tag}}</code>{{name}}",
-    "usage": "Usage:\n<code>/link #TAG</code>\nOwner:\n<code>/link TELEGRAM_ID #TAG</code>"
+    "usage": "Usage:\n<code>/link #TAG</code>\nOwner:\n<code>/link TELEGRAM_ID #TAG</code>",
+    "ask_token": "🔐 To verify ownership of <code>{{tag}}</code>:\n\n1. Game → Settings → More Settings → <b>API Token</b>\n2. Generate a token\n3. Paste that token here\n\n⚠️ The token is used only for verification and is never stored.\n⏱ Expires in 10 minutes",
+    "prefer_private": "💡 Prefer sending the token in a <b>private chat</b> with the bot.",
+    "token_invalid": "❌ That does not look like an API token. Copy it from game settings and try again.",
+    "token_mismatch": "❌ Token is invalid or does not belong to this account. Generate a new one and retry.",
+    "confirm_title": "✅ Ownership verified — is this your account?",
+    "confirm_ask": "If the details look correct, tap ✅; otherwise ❌.",
+    "no_clan": "No clan",
+    "cancelled": "Cancelled. Nothing was linked.",
+    "session_expired": "⏱ Link session expired. Run /link again.",
+    "not_yours": "This button is not for you."
+  },
+  "link_errors": {
+    "invalid_tag": "❌ Invalid Clash tag.",
+    "not_found": "❌ Clash account not found."
   },
   "myaccounts": {
     "empty": "You have no linked accounts yet.\nStart with <code>/link #TAG</code>.",
@@ -94,8 +108,8 @@
     "col_received": "Received"
   },
   "help": {
-    "public": "📖 <b>How to use the bot</b>\n\nThis bot watches your clan wars and posts alerts in the group automatically.\n\n<b>⚔️ Wars</b>\n/war — Current regular war (roster, attacks, defense)\n/cwl — Clan War League day status\n/clan — Clan profile (level, league, members, …)\n\nGroup alerts: opponent found / battle start / 1 hour left / war end.\n\n<b>🔗 Clash accounts</b>\n/link #TAG — Link your account\nExample: <code>/link #ABC123XYZ</code>\n/unlink #TAG — Unlink one account\n/unlinkall — Unlink all your accounts (asks confirmation)\n/myaccounts — Show your linked accounts\n\nLinking lets the bot mention you when attacks are still missing.\n\n<b>📊 Reports &amp; settings</b>\n/report — This month’s clan performance\n/report 2026-11 — Report for a specific month\n/setting — Bot settings (language now; more options later)\n\n/help — Show this guide",
-    "user": "📖 <b>How to use the bot</b>\n\nThis bot watches your clan wars and posts alerts in the group automatically.\n\n<b>⚔️ Wars</b>\n/war — Current regular war (roster, attacks, defense)\n/cwl — Clan War League day status\n/clan — Clan profile (level, league, members, …)\n\nGroup alerts: opponent found / battle start / 1 hour left / war end.\n\n<b>🔗 Clash accounts</b>\n/link #TAG — Link your account\nExample: <code>/link #ABC123XYZ</code>\n/unlink #TAG — Unlink one account\n/unlinkall — Unlink all your accounts (asks confirmation)\n/myaccounts — Show your linked accounts\n\nLinking lets the bot mention you when attacks are still missing.\n\n<b>📊 Reports &amp; settings</b>\n/report — This month’s clan performance\n/report 2026-11 — Report for a specific month\n/setting — Bot settings (language now; more options later)\n\n/help — Show this guide",
-    "owner": "📖 <b>Owner help</b>\n\n<b>Member commands</b>\n/war /cwl /clan — War &amp; clan info\n/link #TAG · /unlink #TAG · /unlinkall · /myaccounts — Account links\n/report [YYYY-MM] — Monthly performance\n/setting — Bot settings\n/help — Member guide\n\n<b>Owner-only</b>\n/status — Technical status (API, DB, monitor)\n/testnotify — Send a test message to the group\n/testlog — Test the log channel\n/testw — War widget preview\n/link TELEGRAM_ID #TAG — Link an account for someone else\n\nGroup language is controlled with /setting in the group (admins + owner)."
+    "public": "📖 <b>How to use the bot</b>\n\nThis bot watches your clan wars and posts alerts in the group automatically.\n\n<b>⚔️ Wars</b>\n/war — Current regular war (roster, attacks, defense)\n/cwl — Clan War League day status\n/clan — Clan profile (level, league, members, …)\n\nGroup alerts: opponent found / battle start / 1 hour left / war end.\n\n<b>🔗 Clash accounts</b>\n/link #TAG — Link your account (ownership verified)\nExample: <code>/link #ABC123XYZ</code>\n/unlink #TAG — Unlink one account\n/unlinkall — Unlink all your accounts (asks confirmation)\n/myaccounts — Show your linked accounts\n\nLinking lets the bot mention you when attacks are still missing.\n\n<b>📊 Reports &amp; settings</b>\n/report — This month’s clan performance\n/report 2026-11 — Report for a specific month\n/setting — Bot settings (language now; more options later)\n\n/help — Show this guide",
+    "user": "📖 <b>How to use the bot</b>\n\nThis bot watches your clan wars and posts alerts in the group automatically.\n\n<b>⚔️ Wars</b>\n/war — Current regular war (roster, attacks, defense)\n/cwl — Clan War League day status\n/clan — Clan profile (level, league, members, …)\n\nGroup alerts: opponent found / battle start / 1 hour left / war end.\n\n<b>🔗 Clash accounts</b>\n/link #TAG — Link your account (ownership verified)\nExample: <code>/link #ABC123XYZ</code>\n/unlink #TAG — Unlink one account\n/unlinkall — Unlink all your accounts (asks confirmation)\n/myaccounts — Show your linked accounts\n\nLinking lets the bot mention you when attacks are still missing.\n\n<b>📊 Reports &amp; settings</b>\n/report — This month’s clan performance\n/report 2026-11 — Report for a specific month\n/setting — Bot settings (language now; more options later)\n\n/help — Show this guide",
+    "owner": "📖 <b>Owner help</b>\n\n<b>Member commands</b>\n/war /cwl /clan — War &amp; clan info\n/link #TAG · /unlink #TAG · /unlinkall · /myaccounts — Account links\n/report [YYYY-MM] — Monthly performance\n/setting — Bot settings\n/help — Member guide\n\n<b>Owner-only</b>\n/status — Technical status (API, DB, monitor)\n/testnotify — Send a test message to the group\n/testlog — Test the log channel\n/testw — War widget preview\n/link TELEGRAM_ID #TAG — Link an account for someone else (no token required)\n\nGroup language is controlled with /setting in the group (admins + owner)."
   }
 }

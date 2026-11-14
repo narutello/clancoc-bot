@@ -8,6 +8,11 @@ const { t } = require('../utils/i18n');
 const startCommand = require('../commands/start');
 const helpCommand = require('../commands/help');
 const linkCommand = require('../commands/link');
+const {
+  linkTokenMessage,
+  linkConfirmAction,
+  linkCancelAction,
+} = linkCommand;
 const unlinkCommand = require('../commands/unlink');
 const unlinkAllCommand = require('../commands/unlinkall');
 const {
@@ -55,6 +60,11 @@ function createBot() {
   bot.action(/^set:(g|u):(home|lang)(?::[a-z]{2})?$/, settingAction);
 
   bot.command('link', linkCommand);
+  bot.action(/^link:confirm:\d+:[0-9A-Z]+$/, linkConfirmAction);
+  bot.action(/^link:cancel:\d+$/, linkCancelAction);
+  // Capture API token paste while a link verification is pending
+  bot.on('text', linkTokenMessage);
+
   bot.command('unlink', unlinkCommand);
   bot.command('unlinkall', unlinkAllCommand);
   bot.action(/^unlinkall:confirm:\d+$/, unlinkAllConfirmAction);
