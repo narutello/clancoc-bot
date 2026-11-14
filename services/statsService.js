@@ -11,8 +11,8 @@ const {
 const {
   buildWarKey,
   buildWarKeyFromSaved,
-  hasNotification,
-  markNotification,
+  claimNotification,
+  releaseNotification,
 } = require('./warState');
 const { t, DEFAULT_LANG } = require('../utils/i18n');
 const { formatReportText } = require('./reportFormat');
@@ -488,13 +488,15 @@ async function maybeAnnouncePreviousMonth(bot, sendToGroup) {
 
   const event = 'monthly_report';
   const key = `month:${prev}`;
-  if (await hasNotification(key, event)) {
+
+  // Atomic claim — only one process can send the monthly report
+  if (!(await claimNotification(key, event))) {
     return { skipped: true, reason: 'already' };
   }
 
   const report = await buildMonthlyReport(prev);
   if (!report.wars && report.donations.samplePlayers === 0) {
-    await markNotification(key, event);
+    // Keep the claim so we don't retry an empty month forever
     return { skipped: true, reason: 'empty' };
   }
 
@@ -507,16 +509,25 @@ async function maybeAnnouncePreviousMonth(bot, sendToGroup) {
   })}</h2><p>${text.replace(/\n/g, '<br/>')}</p>`;
 
   try {
+    let sent = false;
     if (typeof sendToGroup === 'function') {
-      await sendToGroup(bot, html, lang);
+      sent = await sendToGroup(bot, html, lang);
     }
-    await markNotification(key, event);
+    if (!sent) {
+      try {
+        await releaseNotification(key, event);
+      } catch (_) {}
+      return { skipped: true, error: 'send_failed' };
+    }
     await tgLog.info(`Monthly report sent for ${prev}`, null, {
       module: 'Stats',
     });
     return { skipped: false, monthKey: prev };
   } catch (err) {
     console.error('[Stats] monthly announce failed:', err.message);
+    try {
+      await releaseNotification(key, event);
+    } catch (_) {}
     return { skipped: true, error: err.message };
   }
 }

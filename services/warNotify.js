@@ -12,8 +12,8 @@ const { t, isRtl } = require('../utils/i18n');
 const { getChatLanguage } = require('./settingsService');
 const { formatCwlDayLabel, buildCwlLeagueKey } = require('./cwlService');
 const {
-  hasNotification,
-  markNotification,
+  claimNotification,
+  releaseNotification,
   buildWarKey,
   buildWarKeyFromSaved,
 } = require('./warState');
@@ -42,7 +42,7 @@ async function sendToGroup(bot, html, lang = 'fa') {
       null,
       { module: 'WarMonitor' }
     );
-    return;
+    return false;
   }
   try {
     await withTelegramRetry(
@@ -53,6 +53,7 @@ async function sendToGroup(bot, html, lang = 'fa') {
         }),
       { maxRetries: config.telegramMaxRetries }
     );
+    return true;
   } catch (err) {
     console.error('[WarMonitor] Failed to send rich message:', err.message);
     await tgLog.error('Failed to send rich message to group', err.message, {
@@ -68,27 +69,46 @@ async function sendToGroup(bot, html, lang = 'fa') {
           ),
         { maxRetries: config.telegramMaxRetries }
       );
+      return true;
     } catch (e2) {
       console.error('[WarMonitor] Fallback also failed:', e2.message);
       await tgLog.error('Fallback group message also failed', e2.message, {
         module: 'WarMonitor',
       });
+      return false;
     }
   }
+}
+
+/** Claim → send → release on total failure (prevents duplicate + allows retry). */
+async function sendClaimed(bot, html, lang, warKey, event) {
+  const sent = await sendToGroup(bot, html, lang);
+  if (!sent) {
+    try {
+      await releaseNotification(warKey, event);
+      console.warn(
+        `[WarMonitor] Released claim after send failure: ${event} (${warKey})`
+      );
+    } catch (err) {
+      console.warn('[WarMonitor] releaseNotification failed:', err.message);
+    }
+  }
+  return sent;
 }
 
 async function notifyPreparation(bot, war) {
   const warKey = buildWarKey(war);
   const event = 'preparation';
-  if (await hasNotification(warKey, event)) return;
+  if (!(await claimNotification(warKey, event))) return;
   const lang = await groupLang();
   const title = t('notify.prep_title', { lng: lang });
   const html = await buildWarRichHtml(war, title, '', null, lang);
-  await sendToGroup(bot, html, lang);
-  await tgLog.info('Notification sent: preparation started', null, {
-    module: 'WarMonitor',
-  });
-  await markNotification(warKey, event);
+  const sent = await sendClaimed(bot, html, lang, warKey, event);
+  if (sent) {
+    await tgLog.info('Notification sent: preparation started', null, {
+      module: 'WarMonitor',
+    });
+  }
 }
 
 async function notifyCwlLeagueStart(bot, war, meta) {
@@ -96,23 +116,24 @@ async function notifyCwlLeagueStart(bot, war, meta) {
   if (!war || war.state !== 'preparation') return;
   const leagueKey = buildCwlLeagueKey(meta.cwlSeason);
   const event = 'cwl_league_preparation';
-  if (await hasNotification(leagueKey, event)) return;
+  if (!(await claimNotification(leagueKey, event))) return;
   const lang = await groupLang();
   const title = t('notify.cwl_league_start', { lng: lang });
   const html = await buildWarRichHtml(war, title, '', meta, lang);
-  await sendToGroup(bot, html, lang);
-  await tgLog.info(
-    'Notification sent: CWL league start (day 1 preparation)',
-    null,
-    { module: 'WarMonitor' }
-  );
-  await markNotification(leagueKey, event);
+  const sent = await sendClaimed(bot, html, lang, leagueKey, event);
+  if (sent) {
+    await tgLog.info(
+      'Notification sent: CWL league start (day 1 preparation)',
+      null,
+      { module: 'WarMonitor' }
+    );
+  }
 }
 
 async function notifyBattleStart(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_battle_start' : 'battle_start';
-  if (await hasNotification(warKey, event)) return;
+  if (!(await claimNotification(warKey, event))) return;
   const lang = await groupLang();
   const members = extractMembers(war);
   const attacksUsed = countAttacks(members);
@@ -133,25 +154,28 @@ async function notifyBattleStart(bot, war, isCwl = false) {
     war.__cwlMeta || null,
     lang
   );
-  await sendToGroup(bot, html, lang);
-  await tgLog.info(
-    'Notification sent: battle started' + (isCwl ? ' (CWL)' : ''),
-    null,
-    { module: 'WarMonitor' }
-  );
-  await markNotification(warKey, event);
+  const sent = await sendClaimed(bot, html, lang, warKey, event);
+  if (sent) {
+    await tgLog.info(
+      'Notification sent: battle started' + (isCwl ? ' (CWL)' : ''),
+      null,
+      { module: 'WarMonitor' }
+    );
+  }
 }
 
 async function notifyOneHourLeft(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_one_hour_left' : 'one_hour_left';
-  if (await hasNotification(warKey, event)) return;
 
   const end = parseClashTime(war.endTime);
   if (!end) return;
 
   const msLeft = end.getTime() - Date.now();
+  // Only claim inside the real 50–70 min window (avoid burning the claim too early)
   if (msLeft < 50 * 60 * 1000 || msLeft > 70 * 60 * 1000) return;
+
+  if (!(await claimNotification(warKey, event))) return;
 
   const lang = await groupLang();
   const our = war.clan || {};
@@ -204,15 +228,16 @@ ${dayLine}
 ${pendingHtml}
 ${footer}`.trim();
 
-  await sendToGroup(bot, html, lang);
-  await tgLog.info(
-    'Notification sent: 1 hour left' +
-      (isCwl ? ' (CWL)' : '') +
-      ` — pending attackers: ${pendingCount}`,
-    null,
-    { module: 'WarMonitor' }
-  );
-  await markNotification(warKey, event);
+  const sent = await sendClaimed(bot, html, lang, warKey, event);
+  if (sent) {
+    await tgLog.info(
+      'Notification sent: 1 hour left' +
+        (isCwl ? ' (CWL)' : '') +
+        ` — pending attackers: ${pendingCount}`,
+      null,
+      { module: 'WarMonitor' }
+    );
+  }
 }
 
 async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
@@ -220,7 +245,7 @@ async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
   const warKey = buildWarKeyFromSaved(last);
   if (!warKey) return;
   const event = isCwl ? 'cwl_war_ended' : 'war_ended';
-  if (await hasNotification(warKey, event)) return;
+  if (!(await claimNotification(warKey, event))) return;
   const lang = await groupLang();
   const ourStars = last.our_stars ?? 0;
   const theirStars = last.their_stars ?? 0;
@@ -245,19 +270,20 @@ async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
     lng: lang,
     result: resultLabel(result, lang),
   })}</p>`.trim();
-  await sendToGroup(bot, html, lang);
-  await tgLog.info(
-    'Notification sent: war ended (from saved state)' + (isCwl ? ' (CWL)' : ''),
-    null,
-    { module: 'WarMonitor' }
-  );
-  await markNotification(warKey, event);
+  const sent = await sendClaimed(bot, html, lang, warKey, event);
+  if (sent) {
+    await tgLog.info(
+      'Notification sent: war ended (from saved state)' + (isCwl ? ' (CWL)' : ''),
+      null,
+      { module: 'WarMonitor' }
+    );
+  }
 }
 
 async function notifyWarEnded(bot, war, isCwl = false) {
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_war_ended' : 'war_ended';
-  if (await hasNotification(warKey, event)) return;
+  if (!(await claimNotification(warKey, event))) return;
   const lang = await groupLang();
   const our = war.clan || {};
   const their = war.opponent || {};
@@ -282,13 +308,14 @@ async function notifyWarEnded(bot, war, isCwl = false) {
     war.__cwlMeta || null,
     lang
   );
-  await sendToGroup(bot, html, lang);
-  await tgLog.info(
-    'Notification sent: war ended' + (isCwl ? ' (CWL)' : ''),
-    null,
-    { module: 'WarMonitor' }
-  );
-  await markNotification(warKey, event);
+  const sent = await sendClaimed(bot, html, lang, warKey, event);
+  if (sent) {
+    await tgLog.info(
+      'Notification sent: war ended' + (isCwl ? ' (CWL)' : ''),
+      null,
+      { module: 'WarMonitor' }
+    );
+  }
 }
 
 module.exports = {
