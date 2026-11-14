@@ -72,25 +72,56 @@ async function buildHealthPayload() {
 function startHealthServer(port) {
   const server = http.createServer(async (req, res) => {
     try {
-      const url = (req.url || '/').split('?')[0];
-      if (req.method === 'GET' && (url === '/' || url === '/health')) {
-        const body = await buildHealthPayload();
-        const code = body.ok ? 200 : 503;
+      const rawUrl = req.url || '/';
+      const url = rawUrl.split('?')[0];
+      const method = req.method || 'GET';
+
+      const json = (code, body) => {
         res.writeHead(code, {
           'Content-Type': 'application/json; charset=utf-8',
           'Cache-Control': 'no-store',
         });
-        res.end(JSON.stringify(body, null, 2));
-        return;
+        res.end(JSON.stringify(body));
+      };
+
+      // Public minimal health — safe for platform probes (no internal details)
+      if (method === 'GET' && (url === '/' || url === '/health')) {
+        const db = await checkDb();
+        const ok = db.ok && botReady;
+        return json(ok ? 200 : 503, {
+          ok,
+          service: 'clancoc-bot',
+          time: new Date().toISOString(),
+        });
       }
 
-      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('ClanCoC Bot is running');
+      // Detailed health — requires HEALTH_TOKEN via header or query
+      if (method === 'GET' && url === '/health/detail') {
+        const token = config.healthToken;
+        if (!token) {
+          return json(404, { ok: false, error: 'not_found' });
+        }
+        let provided = req.headers['x-health-token'] || '';
+        if (!provided && rawUrl.includes('?')) {
+          try {
+            const q = new URL(rawUrl, 'http://localhost').searchParams;
+            provided = q.get('token') || '';
+          } catch (_) {}
+        }
+        if (!provided || provided !== token) {
+          return json(401, { ok: false, error: 'unauthorized' });
+        }
+        const body = await buildHealthPayload();
+        return json(body.ok ? 200 : 503, body);
+      }
+
+      return json(404, { ok: false, error: 'not_found' });
     } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(
-        JSON.stringify({ ok: false, error: String(err.message || err) })
-      );
+      res.writeHead(500, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      res.end(JSON.stringify({ ok: false, error: 'internal_error' }));
     }
   });
 
