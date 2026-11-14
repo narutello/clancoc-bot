@@ -50,7 +50,9 @@
     "no_clan": "No clan",
     "cancelled": "Cancelled. Nothing was linked.",
     "session_expired": "⏱ Link session expired. Run /link again.",
-    "not_yours": "This button is not for you."
+    "not_yours": "This button is not for you.",
+    "btn_cancel": "❌ Cancel",
+    "btn_confirm": "✅ Confirm"
   },
   "link_errors": {
     "invalid_tag": "❌ Invalid Clash tag.",
