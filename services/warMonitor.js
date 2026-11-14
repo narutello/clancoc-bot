@@ -5,8 +5,8 @@ const { parseClashTime } = require('../utils/helpers');
 const { findOurCwlWar } = require('./cwlService');
 const { notifyCwlLeagueEnded } = require('./cwlLeagueEnd');
 const {
-  hasNotification,
-  markNotification,
+  claimNotification,
+  releaseNotification,
   getLastState,
   saveState,
   buildWarKey,
@@ -245,8 +245,8 @@ async function checkCwl(bot) {
 
   try {
     await notifyCwlLeagueEnded(bot, found, {
-      hasNotification,
-      markNotification,
+      claimNotification,
+      releaseNotification,
       sendToGroup,
     });
   } catch (err) {
