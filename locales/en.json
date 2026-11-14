@@ -46,7 +46,7 @@
   },
   "help": {
     "public": "📖 Bot help",
-    "user": "📖 <b>Bot help</b>\n\n/war — Regular war status\n/cwl — CWL status\n/clan — Clan info\n/link #TAG — Link a Clash account\n/unlink #TAG — Unlink an account\n/myaccounts — Your linked accounts\n/report — Monthly clan report\n/setting — Language settings\n/help — This help",
+    "user": "📖 <b>Bot help</b>\n\n/war — Regular war status\n/cwl — CWL status\n/clan — Clan info\n/link #TAG — Link a Clash account\n/unlink #TAG — Unlink an account\n/myaccounts — Your linked accounts\n/report — Monthly clan report\n/setting — Language & notification settings\n/help — This help",
     "owner": "📖 <b>Owner help</b>\n\nAll user commands:\n/war /cwl /clan /report /link /unlink /myaccounts /setting\n\nOwner commands:\n/status — Technical status\n/testnotify — Test group notification\n/testlog — Test log channel\n/testw — Widget preview\n/link TELEGRAM_ID #TAG — Link for someone else\n/unlinkall — Remove all your links\n\n/help — This help"
   },
   "notify": {
@@ -66,19 +66,34 @@
     "pending_title": "Still haven't attacked:",
     "result_line": "Result: <b>{{result}}</b>",
     "offline_note": "Bot was offline at war end; status restored from last known data.",
-    "pending_all_done": "Everyone has attacked ✅"
+    "pending_all_done": "Everyone has attacked ✅",
+    "attack_title": "⚔️ New war attack",
+    "attack_title_cwl": "⚔️ New CWL attack"
   },
   "settings": {
     "choose_language": "Choose a language:",
     "current_language": "Current language: <b>{{language}}</b>",
     "denied": "⛔ Only group admins and the bot owner can change group settings.",
     "menu_language": "🌐 Language",
+    "menu_notifications": "🔔 Notifications",
     "open_failed": "❌ Failed to open settings.",
     "title_group": "⚙️ Group settings",
     "title_private": "⚙️ Personal settings",
     "title": "⚙️ Settings",
     "language": "🌐 Language",
-    "saved": "✅ Language saved."
+    "saved": "✅ Language saved.",
+    "notif_menu_title": "🔔 Group notification settings\n\nChoose a war type:",
+    "notif_war": "⚔️ Regular war",
+    "notif_cwl": "🏟 Clan War League (CWL)",
+    "notif_war_title": "⚔️ Regular war notifications\n\nTap an item to toggle on/off:",
+    "notif_cwl_title": "🏟 CWL notifications\n\nTap an item to toggle on/off:",
+    "notif_key_preparation": "Preparation / opponent found",
+    "notif_key_battle_start": "Battle start",
+    "notif_key_one_hour_left": "1 hour left",
+    "notif_key_war_ended": "War ended",
+    "notif_key_attack": "New attack (default off)",
+    "notif_enabled": "✅ Enabled",
+    "notif_disabled": "❌ Disabled"
   },
   "war": {
     "title": "⚔️ War status",
@@ -209,7 +224,7 @@
     "error": "❌ Failed to build report: {{message}}"
   },
   "start": {
-    "message": "Hi 👋\n\nI'm your clan war bot — I stay with the clan and keep track of the fights.\n\n🔍 I auto-watch regular wars and CWL\n📣 I post battle start, end, and 1-hour-left alerts in the group\n📋 I show members, attacks, and defenses with the war commands\n🔗 I link Clash accounts to Telegram for mentions and easier follow-up\n\nCommands: /help\nLanguage: /setting"
+    "message": "Hi 👋\n\nI'm your clan war bot — I stay with the clan and keep track of the fights.\n\n🔍 I auto-watch regular wars and CWL\n📣 I post battle start, end, and 1-hour-left alerts in the group\n📋 I show members, attacks, and defenses with the war commands\n🔗 I link Clash accounts to Telegram for mentions and easier follow-up\n\nCommands: /help\nLanguage & notifications: /setting"
   },
   "loading": {
     "default": "⏳ Loading...",
