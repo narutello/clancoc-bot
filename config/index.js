@@ -77,6 +77,11 @@ const config = {
   telegramMaxRetries: intEnv('TELEGRAM_MAX_RETRIES', 3),
 
   statsRetentionMonths: intEnv('STATS_RETENTION_MONTHS', 6),
+
+  // Optional token for detailed /health/detail (public /health stays minimal)
+  healthToken: process.env.HEALTH_TOKEN
+    ? process.env.HEALTH_TOKEN.trim()
+    : null,
 };
 
 if (!config.clanTag) {
