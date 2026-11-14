@@ -42,12 +42,18 @@ function playerSummaryHtml(player, lang, t) {
   );
 }
 
-function confirmKeyboard(telegramId, tag) {
+function cancelKeyboard(telegramId, label) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(label || '❌', `link:cancel:${telegramId}`)],
+  ]);
+}
+
+function confirmKeyboard(telegramId, tag, confirmLabel, cancelLabel) {
   const clean = normalizeTag(tag);
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback('✅', `link:confirm:${telegramId}:${clean}`),
-      Markup.button.callback('❌', `link:cancel:${telegramId}`),
+      Markup.button.callback(confirmLabel || '✅', `link:confirm:${telegramId}:${clean}`),
+      Markup.button.callback(cancelLabel || '❌', `link:cancel:${telegramId}`),
     ],
   ]);
 }
@@ -126,10 +132,10 @@ async function linkCommand(ctx) {
       ? `\n\n${ctx.t('link.prefer_private')}`
       : '';
 
-  return ctx.reply(
-    ctx.t('link.ask_token', { tag }) + hint,
-    HTML
-  );
+  return ctx.reply(ctx.t('link.ask_token', { tag }) + hint, {
+    ...HTML,
+    ...cancelKeyboard(from.id, ctx.t('link.btn_cancel')),
+  });
 }
 
 /** Handle plain text when user is in await_token step (token paste). */
@@ -146,7 +152,10 @@ async function linkTokenMessage(ctx, next) {
   const token = String(ctx.message.text).trim();
   // In-game CoC API tokens are short (~8 chars), one-time use
   if (token.length < 4 || token.length > 64 || /\s/.test(token)) {
-    return ctx.reply(ctx.t('link.token_invalid'), HTML);
+    return ctx.reply(ctx.t('link.token_invalid'), {
+      ...HTML,
+      ...cancelKeyboard(from.id, ctx.t('link.btn_cancel')),
+    });
   }
 
   // Best-effort: delete the message containing the token (private chats)
@@ -168,17 +177,28 @@ async function linkTokenMessage(ctx, next) {
     const html = playerSummaryHtml(player, ctx.lang || 'fa', ctx.t.bind(ctx));
     return ctx.reply(html, {
       ...HTML,
-      ...confirmKeyboard(from.id, pending.tag),
+      ...confirmKeyboard(
+        from.id,
+        pending.tag,
+        ctx.t('link.btn_confirm'),
+        ctx.t('link.btn_cancel')
+      ),
     });
   } catch (err) {
     if (err.isAuthError) {
-      return ctx.reply(ctx.t('link.token_mismatch'), HTML);
+      return ctx.reply(ctx.t('link.token_mismatch'), {
+        ...HTML,
+        ...cancelKeyboard(from.id, ctx.t('link.btn_cancel')),
+      });
     }
     if (err.isNotFound) {
       clearPending(from.id);
       return ctx.reply(ctx.t('link_errors.not_found'), HTML);
     }
-    return ctx.reply(ctx.t('common.error', { message: err.message }), HTML);
+    return ctx.reply(ctx.t('common.error', { message: err.message }), {
+      ...HTML,
+      ...cancelKeyboard(from.id, ctx.t('link.btn_cancel')),
+    });
   }
 }
 
