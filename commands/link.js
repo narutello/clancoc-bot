@@ -144,8 +144,8 @@ async function linkTokenMessage(ctx, next) {
   if (!pending || pending.step !== 'await_token') return next();
 
   const token = String(ctx.message.text).trim();
-  // Heuristic: CoC API tokens are long JWTs / eyJ...
-  if (token.length < 20) {
+  // In-game CoC API tokens are short (~8 chars), one-time use
+  if (token.length < 4 || token.length > 64 || /\s/.test(token)) {
     return ctx.reply(ctx.t('link.token_invalid'), HTML);
   }
 

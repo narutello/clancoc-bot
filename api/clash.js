@@ -10,9 +10,6 @@ const client = axios.create({
   },
 });
 
-/** Official CoC API — used only for player-token ownership checks. */
-const OFFICIAL_API_BASE = 'https://api.clashofclans.com/v1';
-
 function encodeTag(tag) {
   const clean = String(tag).replace(/^#/, '').toUpperCase();
   return `%23${clean}`;
@@ -108,50 +105,60 @@ async function getPlayer(tag) {
 }
 
 /**
- * Prove ownership: call official API with the player's own API token.
- * Returns the player profile on success. Never log or store the token.
+ * Verify in-game player API token (short code from Settings → API Token).
+ * Official endpoint: POST /players/{tag}/verifytoken
+ * Body: { "token": "<player token>" }
+ * Auth: developer Bearer token (same as other API calls).
+ * Returns player profile on success. Never stores the player token.
  */
 async function verifyPlayerWithToken(tag, playerToken) {
   const clean = String(tag).replace(/^#/, '').toUpperCase();
   const token = String(playerToken || '').trim();
-  if (!token || token.length < 20) {
+
+  // In-game tokens are typically ~8 alphanumeric chars (one-time use)
+  if (!token || token.length < 4 || token.length > 64) {
     const err = new Error('Invalid player API token');
     err.isAuthError = true;
     throw err;
   }
 
+  const path = `/players/${encodeTag(clean)}/verifytoken`;
+
   try {
-    const res = await axios.get(`${OFFICIAL_API_BASE}/players/${encodeTag(clean)}`, {
-      timeout: config.clashApiTimeoutMs || 15000,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    });
-    const data = res.data;
-    const returned = String(data?.tag || '')
-      .replace(/^#/, '')
-      .toUpperCase();
-    if (returned !== clean) {
-      const err = new Error('Token does not match this player tag');
+    const res = await client.post(
+      path,
+      { token },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      }
+    );
+    const status = String(res.data?.status || '').toLowerCase();
+    if (status !== 'ok') {
+      const err = new Error('Player token invalid or expired');
       err.isAuthError = true;
       throw err;
     }
-    return data;
   } catch (err) {
     if (err.isAuthError) throw err;
-    const status = err.response?.status;
+    const httpStatus = err.response?.status;
     const message =
       err.response?.data?.message ||
       err.response?.data?.reason ||
       err.message;
     const error = new Error(`Player token verify failed: ${message}`);
-    error.status = status;
-    error.isNotFound = status === 404;
-    error.isAuthError = status === 401 || status === 403;
-    error.isRateLimited = status === 429;
+    error.status = httpStatus;
+    error.isNotFound = httpStatus === 404;
+    error.isAuthError =
+      httpStatus === 401 || httpStatus === 403 || httpStatus === 400;
+    error.isRateLimited = httpStatus === 429;
     throw error;
   }
+
+  // Token valid — load profile for confirmation UI (bot developer token)
+  return getPlayer(clean);
 }
 
 module.exports = {
