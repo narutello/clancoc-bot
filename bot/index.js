@@ -57,12 +57,15 @@ function createBot() {
 
   bot.command('setting', settingCommand);
   bot.command('settings', settingCommand);
-  bot.action(/^set:(g|u):(home|lang)(?::[a-z]{2})?$/, settingAction);
+  // home | lang[:code] | notif | notif:war|cwl | notif:war|cwl:key
+  bot.action(
+    /^set:(g|u):(home|lang|notif)(?::(?:[a-z]{2}|war|cwl))?(?::[a-z_]+)?$/,
+    settingAction
+  );
 
   bot.command('link', linkCommand);
   bot.action(/^link:confirm:\d+:[0-9A-Z]+$/, linkConfirmAction);
   bot.action(/^link:cancel:\d+$/, linkCancelAction);
-  // Capture API token paste while a link verification is pending
   bot.on('text', linkTokenMessage);
 
   bot.command('unlink', unlinkCommand);
