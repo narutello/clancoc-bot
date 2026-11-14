@@ -88,7 +88,7 @@ function buildLeagueEndStandingsTable(standings) {
 async function notifyCwlLeagueEnded(
   bot,
   found,
-  { hasNotification, markNotification, sendToGroup }
+  { claimNotification, releaseNotification, sendToGroup }
 ) {
   let data;
   try {
@@ -105,7 +105,6 @@ async function notifyCwlLeagueEnded(
   const season = data.season || found?.cwlSeason || 'unknown';
   const leagueKey = buildCwlLeagueKey(season);
   const event = 'cwl_league_ended';
-  if (await hasNotification(leagueKey, event)) return;
 
   const groupEnded = String(data.state || '').toLowerCase() === 'ended';
   const noActiveWars = (data.activeWars || 0) === 0;
@@ -124,6 +123,8 @@ async function notifyCwlLeagueEnded(
 
   if (!leagueFinished) return;
   if ((data.activeWars || 0) > 0 && !groupEnded) return;
+
+  if (!(await claimNotification(leagueKey, event))) return;
 
   const lang = await groupLang();
   const our = data.ourRow;
@@ -163,7 +164,13 @@ ${summary}
 ${thanks}
 <p>${t('notify.good_job', { lng: lang })}</p>`.trim();
 
-  await sendToGroup(bot, html, lang);
+  const sent = await sendToGroup(bot, html, lang);
+  if (!sent) {
+    try {
+      await releaseNotification(leagueKey, event);
+    } catch (_) {}
+    return;
+  }
   await tgLog.info(
     `Notification sent: CWL league ended — rank ${our?.rank || '?'}/${totalClans}`,
     {
@@ -173,7 +180,6 @@ ${thanks}
     },
     { module: 'WarMonitor' }
   );
-  await markNotification(leagueKey, event);
 }
 
 module.exports = { notifyCwlLeagueEnded };
