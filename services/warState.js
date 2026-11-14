@@ -18,6 +18,29 @@ async function markNotification(warKey, eventType, payloadHash = null) {
   );
 }
 
+/**
+ * Atomically claim a notification slot.
+ * Returns true only for the first successful claim (prevents duplicate sends).
+ */
+async function claimNotification(warKey, eventType, payloadHash = null) {
+  const res = await query(
+    `INSERT INTO war_notifications (war_key, event_type, payload_hash)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (war_key, event_type) DO NOTHING
+     RETURNING war_key`,
+    [warKey, eventType, payloadHash]
+  );
+  return res.rowCount > 0;
+}
+
+/** Release a claimed slot so a later retry can send (e.g. after total send failure). */
+async function releaseNotification(warKey, eventType) {
+  await query(
+    `DELETE FROM war_notifications WHERE war_key = $1 AND event_type = $2`,
+    [warKey, eventType]
+  );
+}
+
 async function getLastState() {
   const res = await query(`SELECT * FROM war_state WHERE id = 1`);
   return res.rows[0] || null;
@@ -71,6 +94,8 @@ function buildWarKeyFromSaved(last) {
 module.exports = {
   hasNotification,
   markNotification,
+  claimNotification,
+  releaseNotification,
   getLastState,
   saveState,
   buildWarKey,
