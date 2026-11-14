@@ -7,9 +7,11 @@ const {
   parseClashTime,
   stripEmojis,
   getAttacksPerMember,
+  formatTag,
+  tgUserLink,
 } = require('../utils/helpers');
 const { t, isRtl } = require('../utils/i18n');
-const { getChatLanguage } = require('./settingsService');
+const { getChatLanguage, isNotifyEnabled } = require('./settingsService');
 const { formatCwlDayLabel, buildCwlLeagueKey } = require('./cwlService');
 const {
   claimNotification,
@@ -24,6 +26,7 @@ const {
   buildPendingAttackersHtml,
   buildWarRichHtml,
 } = require('./warHtml');
+const { getLinksForTags } = require('./linkService');
 
 async function groupLang() {
   if (!config.telegramGroupId) return 'fa';
@@ -31,6 +34,15 @@ async function groupLang() {
     return await getChatLanguage(config.telegramGroupId);
   } catch {
     return 'fa';
+  }
+}
+
+async function groupNotifyEnabled(scope, key) {
+  if (!config.telegramGroupId) return true;
+  try {
+    return await isNotifyEnabled(config.telegramGroupId, scope, key);
+  } catch {
+    return true;
   }
 }
 
@@ -80,7 +92,6 @@ async function sendToGroup(bot, html, lang = 'fa') {
   }
 }
 
-/** Claim → send → release on total failure (prevents duplicate + allows retry). */
 async function sendClaimed(bot, html, lang, warKey, event) {
   const sent = await sendToGroup(bot, html, lang);
   if (!sent) {
@@ -97,6 +108,7 @@ async function sendClaimed(bot, html, lang, warKey, event) {
 }
 
 async function notifyPreparation(bot, war) {
+  if (!(await groupNotifyEnabled('war', 'preparation'))) return;
   const warKey = buildWarKey(war);
   const event = 'preparation';
   if (!(await claimNotification(warKey, event))) return;
@@ -114,6 +126,7 @@ async function notifyPreparation(bot, war) {
 async function notifyCwlLeagueStart(bot, war, meta) {
   if (!meta || meta.cwlDay !== 1) return;
   if (!war || war.state !== 'preparation') return;
+  if (!(await groupNotifyEnabled('cwl', 'preparation'))) return;
   const leagueKey = buildCwlLeagueKey(meta.cwlSeason);
   const event = 'cwl_league_preparation';
   if (!(await claimNotification(leagueKey, event))) return;
@@ -131,6 +144,8 @@ async function notifyCwlLeagueStart(bot, war, meta) {
 }
 
 async function notifyBattleStart(bot, war, isCwl = false) {
+  const scope = isCwl ? 'cwl' : 'war';
+  if (!(await groupNotifyEnabled(scope, 'battle_start'))) return;
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_battle_start' : 'battle_start';
   if (!(await claimNotification(warKey, event))) return;
@@ -165,6 +180,8 @@ async function notifyBattleStart(bot, war, isCwl = false) {
 }
 
 async function notifyOneHourLeft(bot, war, isCwl = false) {
+  const scope = isCwl ? 'cwl' : 'war';
+  if (!(await groupNotifyEnabled(scope, 'one_hour_left'))) return;
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_one_hour_left' : 'one_hour_left';
 
@@ -172,7 +189,6 @@ async function notifyOneHourLeft(bot, war, isCwl = false) {
   if (!end) return;
 
   const msLeft = end.getTime() - Date.now();
-  // Only claim inside the real 50–70 min window (avoid burning the claim too early)
   if (msLeft < 50 * 60 * 1000 || msLeft > 70 * 60 * 1000) return;
 
   if (!(await claimNotification(warKey, event))) return;
@@ -242,6 +258,8 @@ ${footer}`.trim();
 
 async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
   if (!last || !last.opponent_tag) return;
+  const scope = isCwl ? 'cwl' : 'war';
+  if (!(await groupNotifyEnabled(scope, 'war_ended'))) return;
   const warKey = buildWarKeyFromSaved(last);
   if (!warKey) return;
   const event = isCwl ? 'cwl_war_ended' : 'war_ended';
@@ -281,6 +299,8 @@ async function notifyWarEndedFromSaved(bot, last, isCwl = false) {
 }
 
 async function notifyWarEnded(bot, war, isCwl = false) {
+  const scope = isCwl ? 'cwl' : 'war';
+  if (!(await groupNotifyEnabled(scope, 'war_ended'))) return;
   const warKey = buildWarKey(war);
   const event = isCwl ? 'cwl_war_ended' : 'war_ended';
   if (!(await claimNotification(warKey, event))) return;
@@ -318,6 +338,94 @@ async function notifyWarEnded(bot, war, isCwl = false) {
   }
 }
 
+/** Diff previous vs current members to find newly landed attacks. */
+function findNewAttacks(prevMembers, nextMembers) {
+  const prevMap = new Map();
+  for (const m of prevMembers || []) {
+    if (!m?.tag) continue;
+    prevMap.set(m.tag, (m.attacks || []).length);
+  }
+  const found = [];
+  for (const m of nextMembers || []) {
+    if (!m?.tag) continue;
+    const prevCount = prevMap.get(m.tag) || 0;
+    const attacks = m.attacks || [];
+    const nowCount = attacks.length;
+    if (nowCount <= prevCount) continue;
+    for (let i = prevCount; i < nowCount; i++) {
+      found.push({
+        member: m,
+        attack: attacks[i] || {},
+        attackIndex: i + 1,
+      });
+    }
+  }
+  return found;
+}
+
+async function notifyNewAttacks(bot, war, prevMembers, isCwl = false) {
+  const scope = isCwl ? 'cwl' : 'war';
+  if (!(await groupNotifyEnabled(scope, 'attack'))) return;
+  if (!war || war.state !== 'inWar') return;
+
+  const nextMembers = extractMembers(war);
+  const news = findNewAttacks(prevMembers, nextMembers);
+  if (news.length === 0) return;
+
+  const warKey = buildWarKey(war);
+  const lang = await groupLang();
+  const tags = news.map((n) => n.member.tag).filter(Boolean);
+  let linksMap = new Map();
+  try {
+    linksMap = await getLinksForTags(tags);
+  } catch (_) {}
+
+  for (const item of news) {
+    const tag = item.member.tag;
+    const event = `attack:${tag}:${item.attackIndex}`;
+    if (!(await claimNotification(warKey, event))) continue;
+
+    const name = escapeHtml(item.member.name || formatTag(tag));
+    const stars = item.attack.stars ?? 0;
+    const dest =
+      item.attack.destructionPercentage != null
+        ? Number(item.attack.destructionPercentage).toFixed(1)
+        : '—';
+    const th = item.member.townhallLevel ?? item.member.townHallLevel ?? '—';
+
+    let who = name;
+    const links = linksMap.get(tag) || [];
+    if (links.length > 0) {
+      who = links
+        .map((u) =>
+          tgUserLink(
+            u.telegram_id,
+            item.member.name || formatTag(tag)
+          )
+        )
+        .join(' / ');
+    }
+
+    const title = isCwl
+      ? t('notify.attack_title_cwl', { lng: lang })
+      : t('notify.attack_title', { lng: lang });
+
+    const html = `<h2>${title}</h2>
+<p>⚔️ ${who}</p>
+<p>🏠 TH ${th} · ⭐ ${stars} · 💥 ${dest}%</p>
+<p><code>${formatTag(tag)}</code></p>`.trim();
+
+    const sent = await sendClaimed(bot, html, lang, warKey, event);
+    if (sent) {
+      await tgLog.info(
+        `Notification sent: attack by ${tag}` + (isCwl ? ' (CWL)' : ''),
+        null,
+        { module: 'WarMonitor' }
+      );
+    }
+  }
+}
+
 module.exports = {
   sendToGroup,
   notifyPreparation,
@@ -326,5 +434,7 @@ module.exports = {
   notifyOneHourLeft,
   notifyWarEndedFromSaved,
   notifyWarEnded,
+  notifyNewAttacks,
+  findNewAttacks,
   groupLang,
 };

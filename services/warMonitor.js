@@ -21,6 +21,7 @@ const {
   notifyOneHourLeft,
   notifyWarEndedFromSaved,
   notifyWarEnded,
+  notifyNewAttacks,
 } = require('./warNotify');
 const {
   markPollStart,
@@ -33,6 +34,7 @@ const {
   recordFinishedWarFromSaved,
   runStatsMaintenance,
 } = require('./statsService');
+const { isNotifyEnabled } = require('./settingsService');
 
 let lastLoggedWarState = null;
 let monitorTimer = null;
@@ -109,6 +111,24 @@ function computeNextInterval(war) {
   return { ms: clampPollMs(active), reason: 'default_active' };
 }
 
+async function maybeNotifyAttacks(bot, war, last, isCwl) {
+  if (!war || war.state !== 'inWar') return;
+  const warKey = buildWarKey(war);
+  const lastKey = buildWarKeyFromSaved(last);
+  if (!last || lastKey !== warKey) return;
+  if (last.state !== 'inWar' && last.state !== 'preparation') return;
+
+  let prevMembers = last.members_json;
+  if (typeof prevMembers === 'string') {
+    try {
+      prevMembers = JSON.parse(prevMembers);
+    } catch {
+      prevMembers = [];
+    }
+  }
+  await notifyNewAttacks(bot, war, prevMembers || [], isCwl);
+}
+
 async function checkRegularWar(bot) {
   const last = await getLastState();
   let war;
@@ -146,6 +166,7 @@ async function checkRegularWar(bot) {
   if (war.state === 'preparation') await notifyPreparation(bot, war);
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, false);
+    await maybeNotifyAttacks(bot, war, last, false);
     await notifyOneHourLeft(bot, war, false);
   }
   if (war.state === 'warEnded') {
@@ -211,6 +232,7 @@ async function checkCwl(bot) {
   if (war.state === 'preparation') await notifyCwlLeagueStart(bot, war, meta);
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, true);
+    await maybeNotifyAttacks(bot, war, last, true);
     await notifyOneHourLeft(bot, war, true);
   }
 
@@ -244,11 +266,16 @@ async function checkCwl(bot) {
   }
 
   try {
-    await notifyCwlLeagueEnded(bot, found, {
-      claimNotification,
-      releaseNotification,
-      sendToGroup,
-    });
+    const leagueEndAllowed =
+      !config.telegramGroupId ||
+      (await isNotifyEnabled(config.telegramGroupId, 'cwl', 'war_ended'));
+    if (leagueEndAllowed) {
+      await notifyCwlLeagueEnded(bot, found, {
+        claimNotification,
+        releaseNotification,
+        sendToGroup,
+      });
+    }
   } catch (err) {
     console.warn('[WarMonitor] notifyCwlLeagueEnded error:', err.message);
     await tgLog.warn('notifyCwlLeagueEnded error', err.message, {
