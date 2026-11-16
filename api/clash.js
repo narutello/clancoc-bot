@@ -34,7 +34,34 @@ function getRetryAfterMs(err, attempt) {
   return Math.min(1000 * Math.pow(2, attempt - 1), 12000);
 }
 
-function isRetryableStatus(status) {
+/**
+ * True only when Supercell clearly signals API/game maintenance.
+ * Generic 500 / unknownException alone is NOT treated as maintenance.
+ */
+function isMaintenanceResponse(status, message, reason) {
+  const text = `${message || ''} ${reason || ''}`.toLowerCase();
+  if (!text.trim()) return false;
+
+  // Explicit maintenance wording from official API
+  if (
+    /\bin maintenance\b/.test(text) ||
+    /\bunder maintenance\b/.test(text) ||
+    /\bcurrently in maintenance\b/.test(text) ||
+    /\bapi is currently in maintenance\b/.test(text)
+  ) {
+    return true;
+  }
+
+  // 503 + come back later is the known maintenance payload
+  if (status === 503 && /come back later/.test(text)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isRetryableStatus(status, isMaintenance) {
+  if (isMaintenance) return false;
   if (!status) return true;
   if (status === 429 || status === 408) return true;
   if (status >= 500 && status <= 599) return true;
@@ -43,6 +70,27 @@ function isRetryableStatus(status) {
 
 function isPermanentStatus(status) {
   return status === 401 || status === 403 || status === 404 || status === 400;
+}
+
+function buildClashError(err) {
+  const status = err.response?.status;
+  const data = err.response?.data || {};
+  const message = data.message || data.reason || err.message;
+  const reason = data.reason || '';
+  const maintenance = isMaintenanceResponse(status, message, reason);
+
+  const error = new Error(
+    maintenance
+      ? 'Clash API maintenance'
+      : `Clash API error ${status || ''}: ${message}`
+  );
+  error.status = status;
+  error.isNotFound = status === 404;
+  error.isRateLimited = status === 429;
+  error.isAuthError = status === 401 || status === 403;
+  error.isMaintenance = maintenance;
+  error.apiMessage = message;
+  return error;
 }
 
 async function request(path, retries = config.clashMaxRetries || 3) {
@@ -54,12 +102,15 @@ async function request(path, retries = config.clashMaxRetries || 3) {
     } catch (err) {
       lastError = err;
       const status = err.response?.status;
+      const data = err.response?.data || {};
+      const message = data.message || data.reason || err.message;
+      const maintenance = isMaintenanceResponse(status, message, data.reason);
 
-      if (isPermanentStatus(status)) {
+      if (maintenance || isPermanentStatus(status)) {
         break;
       }
 
-      if (!isRetryableStatus(status) || attempt === retries) {
+      if (!isRetryableStatus(status, maintenance) || attempt === retries) {
         break;
       }
 
@@ -71,17 +122,7 @@ async function request(path, retries = config.clashMaxRetries || 3) {
     }
   }
 
-  const status = lastError.response?.status;
-  const message =
-    lastError.response?.data?.message ||
-    lastError.response?.data?.reason ||
-    lastError.message;
-  const error = new Error(`Clash API error ${status || ''}: ${message}`);
-  error.status = status;
-  error.isNotFound = status === 404;
-  error.isRateLimited = status === 429;
-  error.isAuthError = status === 401 || status === 403;
-  throw error;
+  throw buildClashError(lastError);
 }
 
 async function getClan(tag = config.clanTag) {
@@ -143,18 +184,8 @@ async function verifyPlayerWithToken(tag, playerToken) {
     }
   } catch (err) {
     if (err.isAuthError) throw err;
-    const httpStatus = err.response?.status;
-    const message =
-      err.response?.data?.message ||
-      err.response?.data?.reason ||
-      err.message;
-    const error = new Error(`Player token verify failed: ${message}`);
-    error.status = httpStatus;
-    error.isNotFound = httpStatus === 404;
-    error.isAuthError =
-      httpStatus === 401 || httpStatus === 403 || httpStatus === 400;
-    error.isRateLimited = httpStatus === 429;
-    throw error;
+    if (err.isMaintenance) throw err;
+    throw buildClashError(err);
   }
 
   // Token valid — load profile for confirmation UI (bot developer token)
@@ -169,4 +200,5 @@ module.exports = {
   getPlayer,
   verifyPlayerWithToken,
   encodeTag,
+  isMaintenanceResponse,
 };

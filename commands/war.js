@@ -9,6 +9,7 @@ const {
   deleteLoading,
   replaceLoadingText,
 } = require('../utils/loading');
+const { clashUserMessage } = require('../utils/apiErrors');
 const {
   keyboardOur,
   keyboardEnemy,
@@ -83,11 +84,8 @@ async function warCommand(ctx) {
     return replaceLoadingText(ctx, loadingMsg, ctx.t('war.not_in_war'));
   } catch (err) {
     console.error('[/war]', err.message);
-    return richMessageErrorReply(
-      ctx,
-      err,
-      ctx.t('war.fetch_error', { message: err.message })
-    );
+    const msg = clashUserMessage(err, ctx.t.bind(ctx), 'war.fetch_error');
+    return richMessageErrorReply(ctx, err, msg);
   }
 }
 
@@ -103,7 +101,7 @@ async function warEnemyAction(ctx) {
     return editRich(ctx, html, keyboardEnemy('war', lang), lang);
   } catch (err) {
     console.error('[war:enemy]', err.message);
-    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
+    return ctx.reply(clashUserMessage(err, ctx.t.bind(ctx), 'war.fetch_error'));
   }
 }
 
@@ -119,7 +117,7 @@ async function warHomeAction(ctx) {
     return editRich(ctx, html, keyboardOur('war', lang), lang);
   } catch (err) {
     console.error('[war:home]', err.message);
-    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
+    return ctx.reply(clashUserMessage(err, ctx.t.bind(ctx), 'war.fetch_error'));
   }
 }
 

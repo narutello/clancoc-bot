@@ -4,6 +4,7 @@ const config = require('../config');
 const { checkCommandLimit } = require('../utils/commandRateLimit');
 const { withTelegramRetry } = require('../utils/telegramSafe');
 const { isRtl } = require('../utils/i18n');
+const { clashUserMessage } = require('../utils/apiErrors');
 const {
   sendLoading,
   deleteLoading,
@@ -208,7 +209,7 @@ ${t('clan.min_th')}: ${requiredTh} | ${t('clan.min_trophies')}: ${requiredTrophi
     return replaceLoadingText(
       ctx,
       loadingMsg,
-      t('clan.fetch_error', { message: err.message })
+      clashUserMessage(err, t, 'clan.fetch_error')
     );
   }
 };

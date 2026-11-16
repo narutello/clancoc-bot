@@ -8,6 +8,7 @@ const {
   deleteLoading,
   replaceLoadingText,
 } = require('../utils/loading');
+const { clashUserMessage } = require('../utils/apiErrors');
 const {
   keyboardOur,
   keyboardEnemy,
@@ -76,11 +77,8 @@ async function cwlCommand(ctx) {
     return sendRich(ctx, html, keyboardOur('cwl', lang), lang);
   } catch (err) {
     console.error('[/cwl]', err.message);
-    return richMessageErrorReply(
-      ctx,
-      err,
-      ctx.t('war.fetch_error', { message: err.message })
-    );
+    const msg = clashUserMessage(err, ctx.t.bind(ctx), 'war.fetch_error');
+    return richMessageErrorReply(ctx, err, msg);
   }
 }
 
@@ -96,7 +94,7 @@ async function cwlEnemyAction(ctx) {
     return editRich(ctx, html, keyboardEnemy('cwl', lang), lang);
   } catch (err) {
     console.error('[cwl:enemy]', err.message);
-    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
+    return ctx.reply(clashUserMessage(err, ctx.t.bind(ctx), 'war.fetch_error'));
   }
 }
 
@@ -112,7 +110,7 @@ async function cwlHomeAction(ctx) {
     return editRich(ctx, html, keyboardOur('cwl', lang), lang);
   } catch (err) {
     console.error('[cwl:home]', err.message);
-    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
+    return ctx.reply(clashUserMessage(err, ctx.t.bind(ctx), 'war.fetch_error'));
   }
 }
 
@@ -125,7 +123,7 @@ async function cwlStandingsAction(ctx) {
     return editRich(ctx, html, keyboardStandings(lang), lang);
   } catch (err) {
     console.error('[cwl:standings]', err.message);
-    return ctx.reply(ctx.t('war.fetch_error', { message: err.message }));
+    return ctx.reply(clashUserMessage(err, ctx.t.bind(ctx), 'war.fetch_error'));
   }
 }
 
