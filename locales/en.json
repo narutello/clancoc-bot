@@ -15,6 +15,10 @@
     "defense": "Def",
     "our_clan": "Our clan"
   },
+  "api": {
+    "maintenance": "🛠 Clash of Clans servers are temporarily under maintenance/update.\nPlease try again after the break ends.",
+    "rate_limited": "⏳ Clash API rate limit reached. Please try again in a moment."
+  },
   "time": {
     "today": "today at {{time}}",
     "tomorrow": "tomorrow at {{time}}",
