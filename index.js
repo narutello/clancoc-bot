@@ -7,6 +7,7 @@ const { pool } = require('./database');
 const { tgLog } = require('./utils/telegramLogger');
 const { getMonitorStats } = require('./services/monitorStats');
 const { initI18n } = require('./utils/i18n');
+const maintenance = require('./services/maintenanceService');
 
 const bootAt = Date.now();
 let botReady = false;
@@ -29,6 +30,7 @@ async function buildHealthPayload() {
   const mon = getMonitorStats();
   const db = await checkDb();
   const uptimeSec = Math.floor((Date.now() - bootAt) / 1000);
+  const maint = maintenance.getState();
 
   const ok = db.ok && botReady;
 
@@ -38,6 +40,11 @@ async function buildHealthPayload() {
     time: new Date().toISOString(),
     uptimeSec,
     botReady,
+    maintenance: {
+      enabled: Boolean(maint.enabled),
+      reason: maint.reason,
+      endsAt: maint.endsAt,
+    },
     database: db,
     monitor: {
       lastPollAt: mon.lastPollAt
@@ -92,6 +99,7 @@ function startHealthServer(port) {
           ok,
           service: 'clancoc-bot',
           time: new Date().toISOString(),
+          maintenance: maintenance.isEnabled(),
         });
       }
 
@@ -147,6 +155,13 @@ async function main() {
     process.exit(1);
   }
 
+  const maintState = maintenance.initFromDisk();
+  if (maintState.enabled) {
+    console.log('[INFO] Maintenance mode is ON (from disk)');
+    if (maintState.reason) console.log(`[INFO] Reason: ${maintState.reason}`);
+    if (maintState.endsAt) console.log(`[INFO] Ends at: ${maintState.endsAt}`);
+  }
+
   try {
     await migrate();
   } catch (err) {
@@ -167,6 +182,7 @@ async function main() {
 
   const bot = createBot();
   tgLog.setBot(bot);
+  maintenance.setBot(bot);
 
   bot
     .launch()
@@ -188,6 +204,7 @@ async function main() {
       pollIdleMs: config.warPollIdleMs,
       pollActiveMs: config.warPollActiveMs,
       pollNearMs: config.warPollNearMs,
+      maintenance: maintState.enabled,
     },
     { module: 'Boot' }
   );
@@ -213,8 +230,13 @@ async function main() {
 
   setTimeout(() => {
     try {
-      startWarMonitor(bot);
-      console.log('[OK] War monitor started (adaptive)');
+      if (maintenance.isEnabled()) {
+        stopWarMonitor();
+        console.log('[INFO] War monitor NOT started (maintenance mode)');
+      } else {
+        startWarMonitor(bot);
+        console.log('[OK] War monitor started (adaptive)');
+      }
     } catch (e) {
       console.error('[FAIL] War monitor start:', e.message);
     }
