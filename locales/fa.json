@@ -51,7 +51,28 @@
   "help": {
     "public": "📖 راهنمای ربات",
     "user": "📖 <b>راهنمای ربات</b>\n\n/war — وضعیت وار معمولی\n/cwl — وضعیت لیگ کلن‌ها\n/clan — اطلاعات کلن\n/link #TAG — لینک اکانت کلش\n/unlink #TAG — حذف لینک\n/myaccounts — اکانت‌های لینک‌شده\n/report — گزارش ماهانه کلن\n/setting — تنظیمات زبان و اعلان‌ها\n/help — همین راهنما",
-    "owner": "📖 <b>راهنمای مالک ربات</b>\n\nهمه دستورات کاربر:\n/war /cwl /clan /report /link /unlink /myaccounts /setting\n\nدستورات مالک:\n/status — وضعیت فنی ربات\n/testnotify — تست اعلان گروه\n/testlog — تست کانال لاگ\n/testw — پیش‌نمایش ویجت\n/link TELEGRAM_ID #TAG — لینک برای دیگران\n/unlinkall — حذف همه لینک‌های خودتان\n\n/help — همین راهنما"
+    "owner": "📖 <b>راهنمای مالک ربات</b>\n\nهمه دستورات کاربر:\n/war /cwl /clan /report /link /unlink /myaccounts /setting\n\nدستورات مالک:\n/status — وضعیت فنی ربات\n/maintenance — حالت تعمیرات (خاموش کردن مانیتور)\n/testnotify — تست اعلان گروه\n/testlog — تست کانال لاگ\n/testw — پیش‌نمایش ویجت\n/link TELEGRAM_ID #TAG — لینک برای دیگران\n/unlinkall — حذف همه لینک‌های خودتان\n\n/help — همین راهنما"
+  },
+  "maintenance": {
+    "owner_only": "⛔️ این دستور فقط برای مالک ربات است.",
+    "not_yours": "این تأیید متعلق به شما نیست.",
+    "session_expired": "جلسه منقضی شده. دوباره /maintenance بزنید.",
+    "confirm_prompt": "🔧 می‌خواهید ربات را در حالت <b>تعمیرات</b> قرار دهید؟\n\nبا تأیید، War Monitor متوقف می‌شود و ربات به API و دیتابیس ریکوئست نمی‌زند.",
+    "confirm_btn": "✅ تأیید",
+    "cancel_btn": "❌ لغو",
+    "cancelled": "لغو شد.",
+    "ask_reason": "📝 دلیل تعمیرات را بنویسید (اختیاری):\nیا <b>Skip</b> را بزنید.",
+    "ask_ends": "⏱ زمان پایان تعمیرات را بنویسید (اختیاری):\nمثال: <code>2h</code> · <code>30m</code> · <code>1d</code>\nیا تاریخ مثل <code>2026-11-20 18:00</code>\nیا <b>Skip</b> را بزنید.",
+    "invalid_ends": "❌ فرمت زمان نامعتبر است.\nمثال‌ها: <code>2h</code> · <code>30m</code> · <code>1d</code> · <code>2026-11-20 18:00</code>",
+    "enabled": "✅ حالت تعمیرات فعال شد.\nWar Monitor متوقف شد.",
+    "disabled": "✅ حالت تعمیرات خاموش شد.\nWar Monitor دوباره روشن می‌شود.",
+    "disable_btn": "🟢 خاموش کردن تعمیرات",
+    "status_on": "🔧 <b>حالت تعمیرات فعال است</b>",
+    "status_reason": "📝 دلیل: {{reason}}",
+    "status_ends": "⏱ پایان: {{time}}",
+    "public_default": "🔧 ربات موقتاً در حال تعمیرات است.\nلطفاً بعداً دوباره تلاش کنید.",
+    "public_reason": "<b>دلیل:</b> {{reason}}",
+    "public_ends": "⏱ پایان تقریبی: {{time}}"
   },
   "notify": {
     "fallback_plain": "اعلان وار (حالت متنی)",
