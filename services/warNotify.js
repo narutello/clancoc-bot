@@ -9,6 +9,7 @@ const {
   getAttacksPerMember,
   formatTag,
   tgUserLink,
+  normalizeTag,
 } = require('../utils/helpers');
 const { t, isRtl } = require('../utils/i18n');
 const { getChatLanguage, isNotifyEnabled } = require('./settingsService');
@@ -363,6 +364,18 @@ function findNewAttacks(prevMembers, nextMembers) {
   return found;
 }
 
+/** Look up defender (enemy) town hall level from war.opponent.members */
+function findDefenderTh(war, defenderTag) {
+  if (!defenderTag || !war?.opponent?.members) return null;
+  const clean = normalizeTag(defenderTag);
+  if (!clean) return null;
+  const member = war.opponent.members.find(
+    (m) => normalizeTag(m.tag) === clean
+  );
+  if (!member) return null;
+  return member.townhallLevel ?? member.townHallLevel ?? null;
+}
+
 async function notifyNewAttacks(bot, war, prevMembers, isCwl = false) {
   const scope = isCwl ? 'cwl' : 'war';
   if (!(await groupNotifyEnabled(scope, 'attack'))) return;
@@ -385,15 +398,16 @@ async function notifyNewAttacks(bot, war, prevMembers, isCwl = false) {
     const event = `attack:${tag}:${item.attackIndex}`;
     if (!(await claimNotification(warKey, event))) continue;
 
-    const name = escapeHtml(item.member.name || formatTag(tag));
     const stars = item.attack.stars ?? 0;
     const dest =
       item.attack.destructionPercentage != null
         ? Number(item.attack.destructionPercentage).toFixed(1)
         : '—';
-    const th = item.member.townhallLevel ?? item.member.townHallLevel ?? '—';
 
-    let who = name;
+    const defenderTh = findDefenderTh(war, item.attack.defenderTag);
+    const thDisplay = defenderTh != null ? String(defenderTh) : '—';
+
+    let who = escapeHtml(item.member.name || formatTag(tag));
     const links = linksMap.get(tag) || [];
     if (links.length > 0) {
       who = links
@@ -411,9 +425,10 @@ async function notifyNewAttacks(bot, war, prevMembers, isCwl = false) {
       : t('notify.attack_title', { lng: lang });
 
     const html = `<h2>${title}</h2>
-<p>⚔️ ${who}</p>
-<p>🏠 TH ${th} · ⭐ ${stars} · 💥 ${dest}%</p>
-<p><code>${formatTag(tag)}</code></p>`.trim();
+<p>${t('notify.attack_player', { lng: lang, name: who })}</p>
+<p>${t('notify.attack_stars', { lng: lang, stars })}</p>
+<p>${t('notify.attack_dest', { lng: lang, dest })}</p>
+<p>${t('notify.attack_enemy_th', { lng: lang, th: thDisplay })}</p>`.trim();
 
     const sent = await sendClaimed(bot, html, lang, warKey, event);
     if (sent) {
