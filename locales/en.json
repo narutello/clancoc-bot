@@ -51,7 +51,28 @@
   "help": {
     "public": "📖 Bot help",
     "user": "📖 <b>Bot help</b>\n\n/war — Regular war status\n/cwl — CWL status\n/clan — Clan info\n/link #TAG — Link a Clash account\n/unlink #TAG — Unlink an account\n/myaccounts — Your linked accounts\n/report — Monthly clan report\n/setting — Language & notification settings\n/help — This help",
-    "owner": "📖 <b>Owner help</b>\n\nAll user commands:\n/war /cwl /clan /report /link /unlink /myaccounts /setting\n\nOwner commands:\n/status — Technical status\n/testnotify — Test group notification\n/testlog — Test log channel\n/testw — Widget preview\n/link TELEGRAM_ID #TAG — Link for someone else\n/unlinkall — Remove all your links\n\n/help — This help"
+    "owner": "📖 <b>Owner help</b>\n\nAll user commands:\n/war /cwl /clan /report /link /unlink /myaccounts /setting\n\nOwner commands:\n/status — Technical status\n/maintenance — Maintenance mode (stops monitor)\n/testnotify — Test group notification\n/testlog — Test log channel\n/testw — Widget preview\n/link TELEGRAM_ID #TAG — Link for someone else\n/unlinkall — Remove all your links\n\n/help — This help"
+  },
+  "maintenance": {
+    "owner_only": "⛔️ Owner only.",
+    "not_yours": "This confirmation is not yours.",
+    "session_expired": "Session expired. Run /maintenance again.",
+    "confirm_prompt": "🔧 Put the bot into <b>maintenance</b> mode?\n\nWar Monitor will stop and the bot will not call the API or database.",
+    "confirm_btn": "✅ Confirm",
+    "cancel_btn": "❌ Cancel",
+    "cancelled": "Cancelled.",
+    "ask_reason": "📝 Send a reason (optional):\nor tap <b>Skip</b>.",
+    "ask_ends": "⏱ Send an end time (optional):\nExamples: <code>2h</code> · <code>30m</code> · <code>1d</code>\nor <code>2026-11-20 18:00</code>\nor tap <b>Skip</b>.",
+    "invalid_ends": "❌ Invalid time format.\nExamples: <code>2h</code> · <code>30m</code> · <code>1d</code> · <code>2026-11-20 18:00</code>",
+    "enabled": "✅ Maintenance mode enabled.\nWar Monitor stopped.",
+    "disabled": "✅ Maintenance mode disabled.\nWar Monitor will start again.",
+    "disable_btn": "🟢 Turn maintenance off",
+    "status_on": "🔧 <b>Maintenance mode is ON</b>",
+    "status_reason": "📝 Reason: {{reason}}",
+    "status_ends": "⏱ Ends: {{time}}",
+    "public_default": "🔧 The bot is temporarily under maintenance.\nPlease try again later.",
+    "public_reason": "<b>Reason:</b> {{reason}}",
+    "public_ends": "⏱ Approximate end: {{time}}"
   },
   "notify": {
     "fallback_plain": "War notification (plain text)",
