@@ -3,7 +3,9 @@ const config = require('../config');
 const { tgLog } = require('../utils/telegramLogger');
 const { upsertTelegramUser } = require('../services/linkService');
 const i18nContext = require('../middleware/i18nContext');
+const maintenanceMiddleware = require('../middleware/maintenance');
 const { t } = require('../utils/i18n');
+const { isEnabled } = require('../services/maintenanceService');
 
 const startCommand = require('../commands/start');
 const helpCommand = require('../commands/help');
@@ -36,13 +38,19 @@ const testLogCommand = require('../commands/testlog');
 const testwCommand = require('../commands/testw');
 const settingCommand = require('../commands/setting');
 const { settingAction } = settingCommand;
+const maintenanceCommand = require('../commands/maintenance');
+const {
+  maintenanceAction,
+  maintenanceTextMessage,
+} = maintenanceCommand;
 
 function createBot() {
   const bot = new Telegraf(config.botToken);
 
   bot.use(async (ctx, next) => {
     const user = ctx.from;
-    if (user && user.id) {
+    // Skip DB writes while maintenance is on (DB may be unavailable)
+    if (user && user.id && !isEnabled()) {
       upsertTelegramUser(user).catch((err) => {
         console.warn('[Bot] upsertTelegramUser failed:', err.message);
       });
@@ -51,6 +59,7 @@ function createBot() {
   });
 
   bot.use(i18nContext);
+  bot.use(maintenanceMiddleware);
 
   bot.start(startCommand);
   bot.help(helpCommand);
@@ -63,10 +72,13 @@ function createBot() {
     settingAction
   );
 
+  bot.command('maintenance', maintenanceCommand);
+  bot.action(/^maint:(confirm|cancel|off):\d+$/, maintenanceAction);
+  bot.action(/^maint:skip:(reason|endsAt):\d+$/, maintenanceAction);
+
   bot.command('link', linkCommand);
   bot.action(/^link:confirm:\d+:[0-9A-Z]+$/, linkConfirmAction);
   bot.action(/^link:cancel:\d+$/, linkCancelAction);
-  bot.on('text', linkTokenMessage);
 
   bot.command('unlink', unlinkCommand);
   bot.command('unlinkall', unlinkAllCommand);
@@ -86,6 +98,10 @@ function createBot() {
   bot.command('testnotify', testNotifyCommand);
   bot.command('testlog', testLogCommand);
   bot.command('testw', testwCommand);
+
+  // Maintenance text steps first, then link token handler
+  bot.on('text', maintenanceTextMessage);
+  bot.on('text', linkTokenMessage);
 
   bot.catch(async (err, ctx) => {
     console.error(`[Bot] Error for ${ctx.updateType}:`, err.message);
