@@ -1,14 +1,32 @@
 const config = require('../config');
-const { isEnabled, getState } = require('../services/maintenanceService');
-const { publicMessage } = require('../commands/maintenance');
+const {
+  isEnabled,
+  getState,
+  formatEndsAt,
+} = require('../services/maintenanceService');
 
 function isOwner(userId) {
   return userId != null && Number(userId) === Number(config.ownerTelegramId);
 }
 
+function buildPublicMessage(ctx, state) {
+  const lines = [ctx.t('maintenance.public_default')];
+  if (state.reason) {
+    lines.push('');
+    lines.push(ctx.t('maintenance.public_reason', { reason: state.reason }));
+  }
+  if (state.endsAt) {
+    lines.push(
+      ctx.t('maintenance.public_ends', {
+        time: formatEndsAt(state.endsAt, ctx.lang) || state.endsAt,
+      })
+    );
+  }
+  return lines.join('\n');
+}
+
 /**
  * When maintenance is on, only the owner can use the bot.
- * Owner callbacks for maintenance actions still pass through.
  */
 async function maintenanceMiddleware(ctx, next) {
   if (!isEnabled()) return next();
@@ -16,7 +34,6 @@ async function maintenanceMiddleware(ctx, next) {
   const userId = ctx.from?.id;
   if (isOwner(userId)) return next();
 
-  // Allow answering callback queries so buttons don't spin forever
   if (ctx.callbackQuery) {
     try {
       await ctx.answerCbQuery();
@@ -24,7 +41,7 @@ async function maintenanceMiddleware(ctx, next) {
   }
 
   const state = getState();
-  const text = publicMessage(ctx, state);
+  const text = buildPublicMessage(ctx, state);
 
   try {
     if (ctx.callbackQuery) {
