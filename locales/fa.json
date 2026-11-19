@@ -72,7 +72,11 @@
     "offline_note": "ربات هنگام پایان آفلاین بود؛ وضعیت از آخرین داده بازیابی شد.",
     "pending_all_done": "همه حمله کرده‌اند ✅",
     "attack_title": "⚔️ حمله جدید در وار",
-    "attack_title_cwl": "⚔️ حمله جدید در لیگ (CWL)"
+    "attack_title_cwl": "⚔️ حمله جدید در لیگ (CWL)",
+    "attack_player": "🎯 {{name}}",
+    "attack_stars": "⭐ {{stars}} ستاره",
+    "attack_dest": "📊 {{dest}}٪",
+    "attack_enemy_th": "🛡️ تانهال حریف: {{th}}"
   },
   "settings": {
     "choose_language": "زبان را انتخاب کنید:",
