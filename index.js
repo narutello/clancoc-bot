@@ -11,6 +11,8 @@ const maintenance = require('./services/maintenanceService');
 
 const bootAt = Date.now();
 let botReady = false;
+/** true when DB is reachable after boot attempts */
+let dbReady = false;
 
 async function checkDb() {
   const start = Date.now();
@@ -32,7 +34,8 @@ async function buildHealthPayload() {
   const uptimeSec = Math.floor((Date.now() - bootAt) / 1000);
   const maint = maintenance.getState();
 
-  const ok = db.ok && botReady;
+  // Bot process is healthy if Telegram is up; DB may be degraded
+  const ok = botReady;
 
   return {
     ok,
@@ -40,6 +43,7 @@ async function buildHealthPayload() {
     time: new Date().toISOString(),
     uptimeSec,
     botReady,
+    dbReady,
     maintenance: {
       enabled: Boolean(maint.enabled),
       reason: maint.reason,
@@ -91,15 +95,15 @@ function startHealthServer(port) {
         res.end(JSON.stringify(body));
       };
 
-      // Public minimal health — safe for platform probes (no internal details)
+      // Public minimal health — process up is enough for platform probes
       if (method === 'GET' && (url === '/' || url === '/health')) {
-        const db = await checkDb();
-        const ok = db.ok && botReady;
+        const ok = botReady;
         return json(ok ? 200 : 503, {
           ok,
           service: 'clancoc-bot',
           time: new Date().toISOString(),
           maintenance: maintenance.isEnabled(),
+          dbReady,
         });
       }
 
@@ -162,19 +166,31 @@ async function main() {
     if (maintState.endsAt) console.log(`[INFO] Ends at: ${maintState.endsAt}`);
   }
 
+  // Database is best-effort. Quota / outage must not kill the process.
   try {
     await migrate();
-  } catch (err) {
-    console.error('Failed to migrate database:', err.message);
-    process.exit(1);
-  }
-
-  try {
     await pool.query('SELECT 1');
+    dbReady = true;
     console.log('[OK] Database connected');
   } catch (err) {
-    console.error('[FAIL] Database connection:', err.message);
-    process.exit(1);
+    dbReady = false;
+    console.error('[WARN] Database unavailable — starting in degraded mode');
+    console.error('[WARN]', err.message);
+
+    // Auto-enable maintenance so WarMonitor stays off and users see a clear message
+    if (!maintenance.isEnabled()) {
+      try {
+        await maintenance.enable({
+          reason:
+            'دیتابیس در دسترس نیست (سهمیه/قطع اتصال). ربات در حالت محدود اجرا می‌شود.',
+          endsAt: null,
+          updatedBy: config.ownerTelegramId,
+        });
+        console.log('[INFO] Maintenance mode auto-enabled due to DB failure');
+      } catch (e) {
+        console.warn('[WARN] Could not auto-enable maintenance:', e.message);
+      }
+    }
   }
 
   const port = process.env.PORT || process.env.SERVER_PORT || 3000;
@@ -196,23 +212,29 @@ async function main() {
     });
 
   console.log('[OK] Bot launch initiated');
-  await tgLog.info(
-    'Bot launch initiated',
-    {
-      clan: config.clanTag,
-      group: config.telegramGroupId,
-      pollIdleMs: config.warPollIdleMs,
-      pollActiveMs: config.warPollActiveMs,
-      pollNearMs: config.warPollNearMs,
-      maintenance: maintState.enabled,
-    },
-    { module: 'Boot' }
-  );
+  try {
+    await tgLog.info(
+      'Bot launch initiated',
+      {
+        clan: config.clanTag,
+        group: config.telegramGroupId,
+        pollIdleMs: config.warPollIdleMs,
+        pollActiveMs: config.warPollActiveMs,
+        pollNearMs: config.warPollNearMs,
+        maintenance: maintenance.isEnabled(),
+        dbReady,
+      },
+      { module: 'Boot' }
+    );
+  } catch (e) {
+    console.warn('[WARN] Boot log skipped:', e.message);
+  }
   console.log(`[INFO] Owner ID: ${config.ownerTelegramId}`);
   console.log(`[INFO] Clan Tag: #${config.clanTag}`);
   console.log(`[INFO] Group ID: ${config.telegramGroupId || 'not set'}`);
   console.log(`[INFO] Log channel: ${config.logTelegramId || 'not set'}`);
   console.log(`[INFO] API Base: ${config.clashApiBaseUrl}`);
+  console.log(`[INFO] DB ready: ${dbReady}`);
   console.log(
     `[INFO] Adaptive poll idle=${config.warPollIdleMs} active=${config.warPollActiveMs} near=${config.warPollNearMs}`
   );
@@ -230,9 +252,11 @@ async function main() {
 
   setTimeout(() => {
     try {
-      if (maintenance.isEnabled()) {
+      if (maintenance.isEnabled() || !dbReady) {
         stopWarMonitor();
-        console.log('[INFO] War monitor NOT started (maintenance mode)');
+        console.log(
+          `[INFO] War monitor NOT started (maintenance=${maintenance.isEnabled()} dbReady=${dbReady})`
+        );
       } else {
         startWarMonitor(bot);
         console.log('[OK] War monitor started (adaptive)');
