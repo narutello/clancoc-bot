@@ -56,6 +56,10 @@ const config = {
   warPollNearMs: intEnv('WAR_POLL_NEAR_MS', 30000),
   warPollMinMs: intEnv('WAR_POLL_MIN_MS', 20000),
 
+  // Capital raid monitor (lighter than war)
+  capitalPollOngoingMs: intEnv('CAPITAL_POLL_ONGOING_MS', 15 * 60 * 1000),
+  capitalPollIdleMs: intEnv('CAPITAL_POLL_IDLE_MS', 45 * 60 * 1000),
+
   logTelegramId: process.env.LOG_TELEGRAM_ID
     ? process.env.LOG_TELEGRAM_ID.trim().replace(/^["']|["']$/g, '')
     : null,

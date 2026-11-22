@@ -10,6 +10,7 @@ const {
   getNotifySettings,
   toggleNotifySetting,
   NOTIFY_KEYS,
+  CAPITAL_NOTIFY_KEYS,
 } = require('../services/settingsService');
 
 function isOwner(userId) {
@@ -98,6 +99,12 @@ function notifMenuKeyboard(lang) {
       ],
       [
         {
+          text: t('settings.notif_capital', { lng: lang }),
+          callback_data: 'set:g:notif:capital',
+        },
+      ],
+      [
+        {
           text: t('common.back', { lng: lang }),
           callback_data: 'set:g:home',
         },
@@ -108,7 +115,8 @@ function notifMenuKeyboard(lang) {
 
 function notifScopeKeyboard(lang, scope, settings) {
   const block = settings[scope] || {};
-  const rows = NOTIFY_KEYS.map((key) => [
+  const keys = scope === 'capital' ? CAPITAL_NOTIFY_KEYS : NOTIFY_KEYS;
+  const rows = keys.map((key) => [
     {
       text: `${onOff(block[key])} ${t(`settings.notif_key_${key}`, { lng: lang })}`,
       callback_data: `set:g:notif:${scope}:${key}`,
@@ -144,9 +152,18 @@ function notifMenuText(lang) {
 }
 
 function notifScopeText(lang, scope) {
-  return scope === 'cwl'
-    ? t('settings.notif_cwl_title', { lng: lang })
-    : t('settings.notif_war_title', { lng: lang });
+  if (scope === 'cwl') return t('settings.notif_cwl_title', { lng: lang });
+  if (scope === 'capital') return t('settings.notif_capital_title', { lng: lang });
+  return t('settings.notif_war_title', { lng: lang });
+}
+
+function isNotifyScope(name) {
+  return name === 'war' || name === 'cwl' || name === 'capital';
+}
+
+function isValidNotifyKey(scope, key) {
+  if (scope === 'capital') return CAPITAL_NOTIFY_KEYS.includes(key);
+  return NOTIFY_KEYS.includes(key);
 }
 
 async function replyPanel(ctx, text, keyboard) {
@@ -254,8 +271,8 @@ async function settingAction(ctx) {
         return editPanel(ctx, notifMenuText(lang), notifMenuKeyboard(lang));
       }
 
-      // Scope list: war | cwl
-      if (section === 'notif' && (arg3 === 'war' || arg3 === 'cwl') && !arg4) {
+      // Scope list: war | cwl | capital
+      if (section === 'notif' && isNotifyScope(arg3) && !arg4) {
         const lang = await getChatLanguage(ctx.chat.id);
         const settings = await getNotifySettings(ctx.chat.id);
         await ctx.answerCbQuery();
@@ -269,8 +286,8 @@ async function settingAction(ctx) {
       // Toggle a key
       if (
         section === 'notif' &&
-        (arg3 === 'war' || arg3 === 'cwl') &&
-        NOTIFY_KEYS.includes(arg4)
+        isNotifyScope(arg3) &&
+        isValidNotifyKey(arg3, arg4)
       ) {
         const lang = await getChatLanguage(ctx.chat.id);
         const settings = await toggleNotifySetting(ctx.chat.id, arg3, arg4);

@@ -31,6 +31,8 @@ const {
   cwlStandingsAction,
 } = cwlCommand;
 const clanCommand = require('../commands/clan');
+const capitalCommand = require('../commands/capital');
+const { raidCommand } = capitalCommand;
 const reportCommand = require('../commands/report');
 const statusCommand = require('../commands/status');
 const testNotifyCommand = require('../commands/testnotify');
@@ -66,9 +68,9 @@ function createBot() {
 
   bot.command('setting', settingCommand);
   bot.command('settings', settingCommand);
-  // home | lang[:code] | notif | notif:war|cwl | notif:war|cwl:key
+  // home | lang[:code] | notif | notif:war|cwl|capital | notif:scope:key
   bot.action(
-    /^set:(g|u):(home|lang|notif)(?::(?:[a-z]{2}|war|cwl))?(?::[a-z_]+)?$/,
+    /^set:(g|u):(home|lang|notif)(?::(?:[a-z]{2}|war|cwl|capital))?(?::[a-z_]+)?$/,
     settingAction
   );
 
@@ -93,6 +95,8 @@ function createBot() {
   bot.action('cwl:home', cwlHomeAction);
   bot.action('cwl:standings', cwlStandingsAction);
   bot.command('clan', clanCommand);
+  bot.command('capital', capitalCommand);
+  bot.command('raid', raidCommand);
   bot.command('report', reportCommand);
   bot.command('status', statusCommand);
   bot.command('testnotify', testNotifyCommand);
