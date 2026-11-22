@@ -39,7 +39,7 @@
     "hall_level": "🏛 سطح Capital Hall",
     "points": "⭐ امتیاز پایتخت",
     "league": "🏅 لیگ پایتخت",
-    "districts": "🗺 دیistrictها",
+    "districts": "🗺 منطقه‌ها",
     "district_name": "منطقه",
     "district_level": "سطح",
     "hint_raid": "برای وضعیت Raid Weekend از /raid استفاده کنید.",
@@ -55,7 +55,7 @@
     "loot": "لوت کل",
     "raids_completed": "رید کامل‌شده",
     "total_attacks": "کل حمله‌ها",
-    "districts_destroyed": "دیistrict نابودشده",
+    "districts_destroyed": "مناطق نابودشده",
     "off_reward": "مدال حمله",
     "def_reward": "مدال دفاع",
     "top_members": "🏆 برترین مشارکت‌کننده‌ها",
@@ -116,7 +116,7 @@
     "cancelled": "لغو شد."
   },
   "help": {
-    "user": "📖 <b>راهنمای کار با ربات</b>\n\nاین ربات وار و پایتخت کلن را پایش می‌کند و اعلان‌ها را خودکار در گروه می‌فرستد.\n\n<b>⚔️ وار</b>\n/war — وضعیت وار معمولی\n/cwl — وضعیت لیگ کلن‌ها\n/clan — مشخصات کلن\n\n<b>🏛 پایتخت</b>\n/capital — وضعیت Capital Hall و دیistrictها\n/raid — وضعیت Raid Weekend فعلی/آخر\n\n<b>🔗 اکانت کلش</b>\n/link #TAG · /unlink #TAG · /unlinkall · /myaccounts\n\n<b>📊 گزارش و تنظیمات</b>\n/report — گزارش ماهانه\n/setting — زبان و اعلان‌ها (وار، CWL، کپیتال)\n/help — همین راهنما",
+    "user": "📖 <b>راهنمای کار با ربات</b>\n\nاین ربات وار و پایتخت کلن را پایش می‌کند و اعلان‌ها را خودکار در گروه می‌فرستد.\n\n<b>⚔️ وار</b>\n/war — وضعیت وار معمولی\n/cwl — وضعیت لیگ کلن‌ها\n/clan — مشخصات کلن\n\n<b>🏛 پایتخت</b>\n/capital — وضعیت Capital Hall و منطقه‌ها\n/raid — وضعیت Raid Weekend فعلی/آخر\n\n<b>🔗 اکانت کلش</b>\n/link #TAG · /unlink #TAG · /unlinkall · /myaccounts\n\n<b>📊 گزارش و تنظیمات</b>\n/report — گزارش ماهانه\n/setting — زبان و اعلان‌ها (وار، CWL، کپیتال)\n/help — همین راهنما",
     "owner": "📖 <b>راهنمای مالک ربات</b>\n\n<b>دستورات اعضا</b>\n/war /cwl /clan /capital /raid\n/link #TAG · /unlink · /unlinkall · /myaccounts\n/report [YYYY-MM] · /setting · /help\n\n<b>فقط مالک</b>\n/status · /maintenance · /testnotify · /testlog · /testw\n/link TELEGRAM_ID #TAG"
   }
 }
