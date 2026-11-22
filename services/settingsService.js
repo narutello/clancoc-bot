@@ -38,6 +38,44 @@ const NOTIFY_KEYS = [
 
 const CAPITAL_NOTIFY_KEYS = ['raid_start', 'raid_ended', 'reminder'];
 
+/** Short in-memory TTL for chat_settings / user language (phase 4). */
+const CACHE_TTL_MS = 45 * 1000;
+/** @type {Map<string, { expires: number, value: any }>} */
+const chatSettingsCache = new Map();
+/** @type {Map<string, { expires: number, value: any }>} */
+const userLangCache = new Map();
+
+function cacheGet(map, key) {
+  try {
+    const k = String(key);
+    const entry = map.get(k);
+    if (!entry) return undefined;
+    if (Date.now() > entry.expires) {
+      map.delete(k);
+      return undefined;
+    }
+    return entry.value;
+  } catch {
+    return undefined;
+  }
+}
+
+function cacheSet(map, key, value) {
+  try {
+    map.set(String(key), { expires: Date.now() + CACHE_TTL_MS, value });
+  } catch {
+    // never break settings path on cache errors
+  }
+}
+
+function cacheDel(map, key) {
+  try {
+    map.delete(String(key));
+  } catch {
+    // ignore
+  }
+}
+
 function mergeNotify(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const out = {
@@ -61,11 +99,17 @@ function mergeNotify(raw) {
 
 async function getChatSettingsRow(chatId) {
   if (chatId == null) return null;
+  const key = String(chatId);
+  const cached = cacheGet(chatSettingsCache, key);
+  if (cached !== undefined) return cached;
+
   const res = await query(
     `SELECT language, settings_json FROM chat_settings WHERE chat_id = $1`,
-    [String(chatId)]
+    [key]
   );
-  return res.rows[0] || null;
+  const row = res.rows[0] || null;
+  cacheSet(chatSettingsCache, key, row);
+  return row;
 }
 
 async function getChatLanguage(chatId) {
@@ -77,14 +121,16 @@ async function getChatLanguage(chatId) {
 
 async function setChatLanguage(chatId, language) {
   const lang = normalizeLang(language) || DEFAULT_LANG;
+  const key = String(chatId);
   await query(
     `INSERT INTO chat_settings (chat_id, language, updated_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (chat_id) DO UPDATE SET
        language = EXCLUDED.language,
        updated_at = NOW()`,
-    [String(chatId), lang]
+    [key, lang]
   );
+  cacheDel(chatSettingsCache, key);
   return lang;
 }
 
@@ -128,6 +174,7 @@ async function toggleNotifySetting(chatId, scope, key) {
   notify[s][key] = !notify[s][key];
   currentJson.notify = notify;
 
+  const keyId = String(chatId);
   await query(
     `INSERT INTO chat_settings (chat_id, language, settings_json, updated_at)
      VALUES ($1, COALESCE($2, 'fa'), $3::jsonb, NOW())
@@ -135,26 +182,34 @@ async function toggleNotifySetting(chatId, scope, key) {
        settings_json = EXCLUDED.settings_json,
        updated_at = NOW()`,
     [
-      String(chatId),
+      keyId,
       row?.language || DEFAULT_LANG,
       JSON.stringify(currentJson),
     ]
   );
+  cacheDel(chatSettingsCache, keyId);
   return notify;
 }
 
 async function getUserLanguage(userId) {
   if (userId == null) return DEFAULT_LANG;
+  const key = String(Number(userId));
+  const cached = cacheGet(userLangCache, key);
+  if (cached !== undefined) return cached;
+
   const res = await query(
     `SELECT language FROM user_settings WHERE user_id = $1`,
     [Number(userId)]
   );
   const lang = normalizeLang(res.rows[0]?.language);
-  return lang || null;
+  const value = lang || null;
+  cacheSet(userLangCache, key, value);
+  return value;
 }
 
 async function setUserLanguage(userId, language) {
   const lang = normalizeLang(language) || DEFAULT_LANG;
+  const key = String(Number(userId));
   await query(
     `INSERT INTO user_settings (user_id, language, updated_at)
      VALUES ($1, $2, NOW())
@@ -163,6 +218,8 @@ async function setUserLanguage(userId, language) {
        updated_at = NOW()`,
     [Number(userId), lang]
   );
+  cacheDel(userLangCache, key);
+  cacheSet(userLangCache, key, lang);
   return lang;
 }
 
