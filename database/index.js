@@ -17,6 +17,9 @@ const pool = new Pool({
   keepAliveInitialDelayMillis: 10000,
 });
 
+/** Process-local counters for poll metrics (not persisted). */
+let queryCount = 0;
+
 pool.on('error', (err) => {
   // Idle clients can die when Neon closes the connection; pool will replace them.
   console.error('[DB] Unexpected error on idle client:', err.message);
@@ -53,6 +56,7 @@ async function query(text, params = [], attempt = 1) {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
+    queryCount += 1;
     const duration = Date.now() - start;
     if (duration > 1000) {
       console.warn(`[DB] Slow query (${duration}ms):`, text.substring(0, 80));
@@ -71,6 +75,17 @@ async function query(text, params = [], attempt = 1) {
   }
 }
 
+function getQueryCount() {
+  return queryCount;
+}
+
+/** Returns count since last reset, then zeroes the counter. */
+function resetQueryCount() {
+  const n = queryCount;
+  queryCount = 0;
+  return n;
+}
+
 async function getClient() {
   return pool.connect();
 }
@@ -80,4 +95,6 @@ module.exports = {
   query,
   getClient,
   isRetryableDbError,
+  getQueryCount,
+  resetQueryCount,
 };

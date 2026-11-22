@@ -1,5 +1,6 @@
 const { getCurrentWar } = require('../api/clash');
 const config = require('../config');
+const { resetQueryCount } = require('../database');
 const { tgLog } = require('../utils/telegramLogger');
 const { parseClashTime } = require('../utils/helpers');
 const { findOurCwlWar } = require('./cwlService');
@@ -8,7 +9,7 @@ const {
   claimNotification,
   releaseNotification,
   getLastState,
-  saveState,
+  saveStateIfChanged,
   buildWarKey,
   buildWarKeyFromSaved,
 } = require('./warState');
@@ -28,6 +29,7 @@ const {
   markPollSuccess,
   markPollError,
   markNextPoll,
+  getMonitorStats,
 } = require('./monitorStats');
 const {
   recordFinishedWar,
@@ -40,8 +42,10 @@ let lastLoggedWarState = null;
 let monitorTimer = null;
 let monitorStopped = false;
 let lastActiveWar = null;
+let lastMetricsLogAt = 0;
 
 const CWL_END_NOTIFY_WINDOW_MS = 8 * 60 * 60 * 1000;
+const METRICS_LOG_EVERY_MS = 15 * 60 * 1000;
 
 function isRecentlyEnded(war, windowMs = CWL_END_NOTIFY_WINDOW_MS) {
   const end = parseClashTime(war?.endTime);
@@ -129,6 +133,24 @@ async function maybeNotifyAttacks(bot, war, last, isCwl) {
   await notifyNewAttacks(bot, war, prevMembers || [], isCwl);
 }
 
+function notInWarPayload() {
+  return {
+    state: 'notInWar',
+    isCwl: false,
+    opponentTag: null,
+    warTag: null,
+    membersJson: null,
+    teamSize: null,
+    preparationStart: null,
+    startTime: null,
+    endTime: null,
+    ourStars: null,
+    theirStars: null,
+    ourDestruction: null,
+    theirDestruction: null,
+  };
+}
+
 async function checkRegularWar(bot) {
   const last = await getLastState();
   let war;
@@ -143,21 +165,10 @@ async function checkRegularWar(bot) {
     if (last && !last.is_cwl && last.state && last.state !== 'notInWar') {
       await notifyWarEndedFromSaved(bot, last, false);
       await recordFinishedWarFromSaved(last, false);
-      await saveState({
-        state: 'notInWar',
-        isCwl: false,
-        opponentTag: null,
-        warTag: null,
-        membersJson: null,
-      });
+      await saveStateIfChanged(last, notInWarPayload());
     } else if (!last?.is_cwl) {
-      await saveState({
-        state: 'notInWar',
-        isCwl: false,
-        opponentTag: null,
-        warTag: null,
-        membersJson: null,
-      });
+      // Idle notInWar: skip write when already stored as notInWar
+      await saveStateIfChanged(last, notInWarPayload());
     }
     return { state: 'notInWar', isCwl: false };
   }
@@ -173,7 +184,7 @@ async function checkRegularWar(bot) {
     await notifyWarEnded(bot, war, false);
     await recordFinishedWar(war, { isCwl: false });
   }
-  await saveState({
+  await saveStateIfChanged(last, {
     state: war.state,
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
@@ -283,7 +294,7 @@ async function checkCwl(bot) {
     });
   }
 
-  await saveState({
+  await saveStateIfChanged(last, {
     state: war.state,
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
@@ -305,6 +316,7 @@ async function checkCwl(bot) {
 
 async function checkWarStatus(bot) {
   markPollStart();
+  resetQueryCount();
   try {
     const cwlWar = await checkCwl(bot);
     const war = await checkRegularWar(bot);
@@ -316,6 +328,7 @@ async function checkWarStatus(bot) {
     const opp =
       active?.opponent?.name || active?.opponent?.tag || '-';
     const isCwl = Boolean(cwlWar && cwlWar.state && cwlWar.state !== 'notInWar');
+    const dbQueries = resetQueryCount();
 
     markPollSuccess({
       state,
@@ -323,6 +336,7 @@ async function checkWarStatus(bot) {
       isCwl,
       cwlDay: cwlWar?.__cwlMeta?.cwlDay || null,
       cwlTotalDays: cwlWar?.__cwlMeta?.cwlTotalDays || null,
+      dbQueries,
     });
 
     try {
@@ -334,7 +348,7 @@ async function checkWarStatus(bot) {
     console.log(`[WarMonitor] Check done — state=${state} opponent=${opp}`);
     await tgLog.debug(
       `War poll OK — state=${state}`,
-      { opponent: String(opp).slice(0, 80), cwl: isCwl },
+      { opponent: String(opp).slice(0, 80), cwl: isCwl, dbQueries },
       { module: 'WarMonitor' }
     );
     if (state !== lastLoggedWarState) {
@@ -343,6 +357,15 @@ async function checkWarStatus(bot) {
         `War state → ${state}`,
         { opponent: String(opp).slice(0, 80), cwl: isCwl },
         { module: 'WarMonitor' }
+      );
+    }
+
+    const now = Date.now();
+    if (now - lastMetricsLogAt >= METRICS_LOG_EVERY_MS) {
+      lastMetricsLogAt = now;
+      const mon = getMonitorStats();
+      console.log(
+        `[WarMonitor] metrics dbQueries(lastPoll)=${dbQueries} saveWrites=${mon.saveStateWrites} saveSkips=${mon.saveStateSkips} polls=${mon.pollCount}`
       );
     }
 

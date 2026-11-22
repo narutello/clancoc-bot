@@ -1,5 +1,6 @@
 const { query } = require('../database');
 const { parseClashTime, normalizeTag } = require('../utils/helpers');
+const { markSaveStateWrite, markSaveStateSkip } = require('./monitorStats');
 
 async function hasNotification(warKey, eventType) {
   const res = await query(
@@ -46,6 +47,89 @@ async function getLastState() {
   return res.rows[0] || null;
 }
 
+function numEq(a, b) {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Number(a) === Number(b);
+}
+
+function tsEq(a, b) {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return false;
+  return ta === tb;
+}
+
+function tagEq(a, b) {
+  const na = normalizeTag(a);
+  const nb = normalizeTag(b);
+  if (!na && !nb) return true;
+  return na === nb;
+}
+
+/**
+ * Fingerprint members + attacks so new attacks always force a save.
+ * Used only for change detection; does not alter notify logic.
+ */
+function membersFingerprint(membersJson) {
+  let members = membersJson;
+  if (typeof members === 'string') {
+    try {
+      members = JSON.parse(members);
+    } catch {
+      members = [];
+    }
+  }
+  if (!Array.isArray(members) || members.length === 0) return '';
+
+  const parts = members.map((m) => {
+    const tag = normalizeTag(m?.tag) || '';
+    const attacks = Array.isArray(m?.attacks) ? m.attacks : [];
+    const atkSig = attacks
+      .map((a) => {
+        const stars = a?.stars ?? 0;
+        const dest = Number(a?.destructionPercentage);
+        const destPart = Number.isFinite(dest) ? dest : 0;
+        const def = normalizeTag(a?.defenderTag) || '';
+        return `${stars}:${destPart}:${def}`;
+      })
+      .join(',');
+    return `${tag}:${attacks.length}:${atkSig}`;
+  });
+  parts.sort();
+  return parts.join('|');
+}
+
+/**
+ * True when war_state row must be written for correct notify/diff behavior.
+ * Compares status fields and full members/attacks fingerprint.
+ */
+function shouldSaveWarState(last, data) {
+  if (!last) return true;
+  if (!data || data.state == null) return true;
+
+  if (String(last.state || '') !== String(data.state || '')) return true;
+  if (Boolean(last.is_cwl) !== Boolean(data.isCwl)) return true;
+  if (!tagEq(last.opponent_tag, data.opponentTag)) return true;
+  if (!tagEq(last.war_tag, data.warTag)) return true;
+  if (!numEq(last.team_size, data.teamSize)) return true;
+  if (!numEq(last.our_stars, data.ourStars)) return true;
+  if (!numEq(last.their_stars, data.theirStars)) return true;
+  if (!numEq(last.our_destruction, data.ourDestruction)) return true;
+  if (!numEq(last.their_destruction, data.theirDestruction)) return true;
+  if (!tsEq(last.preparation_start, data.preparationStart)) return true;
+  if (!tsEq(last.start_time, data.startTime)) return true;
+  if (!tsEq(last.end_time, data.endTime)) return true;
+
+  const prevFp = membersFingerprint(last.members_json);
+  const nextFp = membersFingerprint(data.membersJson);
+  if (prevFp !== nextFp) return true;
+
+  return false;
+}
+
 async function saveState(data) {
   await query(
     `UPDATE war_state SET
@@ -71,6 +155,20 @@ async function saveState(data) {
       data.isCwl || false,
     ]
   );
+  markSaveStateWrite();
+}
+
+/**
+ * Writes war_state only when meaningful fields (including attacks) changed.
+ * @returns {Promise<boolean>} true if a DB write happened
+ */
+async function saveStateIfChanged(last, data) {
+  if (!shouldSaveWarState(last, data)) {
+    markSaveStateSkip();
+    return false;
+  }
+  await saveState(data);
+  return true;
 }
 
 function buildWarKey(war) {
@@ -98,6 +196,9 @@ module.exports = {
   releaseNotification,
   getLastState,
   saveState,
+  saveStateIfChanged,
+  shouldSaveWarState,
+  membersFingerprint,
   buildWarKey,
   buildWarKeyFromSaved,
 };

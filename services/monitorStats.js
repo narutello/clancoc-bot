@@ -20,6 +20,10 @@ const stats = {
   pollCount: 0,
   errorCount: 0,
   adaptiveReason: 'boot',
+  // Lightweight DB metrics (phase 0)
+  lastPollDbQueries: null,
+  saveStateWrites: 0,
+  saveStateSkips: 0,
 };
 
 function markPollStart() {
@@ -35,6 +39,7 @@ function markPollSuccess(snapshot = {}) {
   if (snapshot.isCwl != null) stats.isCwl = Boolean(snapshot.isCwl);
   if (snapshot.cwlDay != null) stats.cwlDay = snapshot.cwlDay;
   if (snapshot.cwlTotalDays != null) stats.cwlTotalDays = snapshot.cwlTotalDays;
+  if (snapshot.dbQueries != null) stats.lastPollDbQueries = snapshot.dbQueries;
 }
 
 function markPollError(err) {
@@ -51,6 +56,14 @@ function markNextPoll(ms, reason) {
   stats.adaptiveReason = reason || 'default';
 }
 
+function markSaveStateWrite() {
+  stats.saveStateWrites += 1;
+}
+
+function markSaveStateSkip() {
+  stats.saveStateSkips += 1;
+}
+
 function getMonitorStats() {
   return { ...stats };
 }
@@ -60,5 +73,7 @@ module.exports = {
   markPollSuccess,
   markPollError,
   markNextPoll,
+  markSaveStateWrite,
+  markSaveStateSkip,
   getMonitorStats,
 };
