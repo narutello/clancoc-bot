@@ -151,8 +151,39 @@ function notInWarPayload() {
   };
 }
 
-async function checkRegularWar(bot) {
-  const last = await getLastState();
+/** Map save payload to war_state row shape used by notify/diff helpers. */
+function toLastRowShape(data) {
+  return {
+    state: data.state,
+    war_tag: data.warTag || null,
+    opponent_tag: data.opponentTag || null,
+    team_size: data.teamSize ?? null,
+    preparation_start: data.preparationStart || null,
+    start_time: data.startTime || null,
+    end_time: data.endTime || null,
+    our_stars: data.ourStars ?? null,
+    their_stars: data.theirStars ?? null,
+    our_destruction: data.ourDestruction ?? null,
+    their_destruction: data.theirDestruction ?? null,
+    members_json: data.membersJson ?? null,
+    is_cwl: Boolean(data.isCwl),
+  };
+}
+
+/**
+ * Persist only when changed; keep shared in-tick state in sync for the other path.
+ * @param {{ last: object|null }} stateRef
+ */
+async function persistSharedState(stateRef, payload) {
+  const saved = await saveStateIfChanged(stateRef.last, payload);
+  if (saved) {
+    stateRef.last = toLastRowShape(payload);
+  }
+  return saved;
+}
+
+async function checkRegularWar(bot, stateRef) {
+  const last = stateRef.last;
   let war;
   try {
     war = await getCurrentWar();
@@ -165,10 +196,10 @@ async function checkRegularWar(bot) {
     if (last && !last.is_cwl && last.state && last.state !== 'notInWar') {
       await notifyWarEndedFromSaved(bot, last, false);
       await recordFinishedWarFromSaved(last, false);
-      await saveStateIfChanged(last, notInWarPayload());
+      await persistSharedState(stateRef, notInWarPayload());
     } else if (!last?.is_cwl) {
       // Idle notInWar: skip write when already stored as notInWar
-      await saveStateIfChanged(last, notInWarPayload());
+      await persistSharedState(stateRef, notInWarPayload());
     }
     return { state: 'notInWar', isCwl: false };
   }
@@ -184,7 +215,7 @@ async function checkRegularWar(bot) {
     await notifyWarEnded(bot, war, false);
     await recordFinishedWar(war, { isCwl: false });
   }
-  await saveStateIfChanged(last, {
+  await persistSharedState(stateRef, {
     state: war.state,
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
@@ -204,7 +235,7 @@ async function checkRegularWar(bot) {
   return war;
 }
 
-async function checkCwl(bot) {
+async function checkCwl(bot, stateRef) {
   let found;
   try {
     found = await findOurCwlWar();
@@ -214,7 +245,7 @@ async function checkCwl(bot) {
     return null;
   }
 
-  const last = await getLastState();
+  const last = stateRef.last;
 
   if (!found || !found.war) {
     if (
@@ -294,10 +325,11 @@ async function checkCwl(bot) {
     });
   }
 
-  await saveStateIfChanged(last, {
+  await persistSharedState(stateRef, {
     state: war.state,
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
+   
     teamSize: war.teamSize,
     preparationStart: war.preparationStartTime
       ? parseClashTime(war.preparationStartTime)
@@ -318,8 +350,11 @@ async function checkWarStatus(bot) {
   markPollStart();
   resetQueryCount();
   try {
-    const cwlWar = await checkCwl(bot);
-    const war = await checkRegularWar(bot);
+    // One read per tick; both paths share and refresh this ref after writes.
+    const stateRef = { last: await getLastState() };
+
+    const cwlWar = await checkCwl(bot, stateRef);
+    const war = await checkRegularWar(bot, stateRef);
     const active =
       cwlWar && cwlWar.state && cwlWar.state !== 'notInWar' ? cwlWar : war;
     lastActiveWar = active;
