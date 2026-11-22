@@ -386,7 +386,7 @@ async function getDonationLeaders(monthKey, limit = 5) {
   const byDonated = [...list].sort((a, b) => b.donated - a.donated).slice(0, limit);
   const byReceived = [...list]
     .sort((a, b) => b.received - a.received)
-    .slice(0, 5);
+    .slice(0, limit);
   return { byDonated, byReceived, samplePlayers: byTag.size };
 }
 
