@@ -3,6 +3,10 @@ const config = require('./config');
 const { createBot } = require('./bot');
 const { migrate } = require('./database/migrate');
 const { startWarMonitor, stopWarMonitor } = require('./services/warMonitor');
+const {
+  startCapitalMonitor,
+  stopCapitalMonitor,
+} = require('./services/capitalMonitor');
 const { pool } = require('./database');
 const { tgLog } = require('./utils/telegramLogger');
 const { getMonitorStats } = require('./services/monitorStats');
@@ -177,7 +181,7 @@ async function main() {
     console.error('[WARN] Database unavailable — starting in degraded mode');
     console.error('[WARN]', err.message);
 
-    // Auto-enable maintenance so WarMonitor stays off and users see a clear message
+    // Auto-enable maintenance so monitors stay off and users see a clear message
     if (!maintenance.isEnabled()) {
       try {
         await maintenance.enable({
@@ -254,15 +258,17 @@ async function main() {
     try {
       if (maintenance.isEnabled() || !dbReady) {
         stopWarMonitor();
+        stopCapitalMonitor();
         console.log(
-          `[INFO] War monitor NOT started (maintenance=${maintenance.isEnabled()} dbReady=${dbReady})`
+          `[INFO] Monitors NOT started (maintenance=${maintenance.isEnabled()} dbReady=${dbReady})`
         );
       } else {
         startWarMonitor(bot);
-        console.log('[OK] War monitor started (adaptive)');
+        startCapitalMonitor(bot);
+        console.log('[OK] War + Capital monitors started');
       }
     } catch (e) {
-      console.error('[FAIL] War monitor start:', e.message);
+      console.error('[FAIL] Monitor start:', e.message);
     }
   }, 4000);
 
@@ -270,6 +276,7 @@ async function main() {
     console.log(`\nReceived ${signal}, shutting down...`);
     try {
       stopWarMonitor();
+      stopCapitalMonitor();
     } catch (_) {}
     try {
       await tgLog.warn(`Shutting down (${signal})`, null, { module: 'Boot' });

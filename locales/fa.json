@@ -50,8 +50,8 @@
   },
   "help": {
     "public": "📖 راهنمای ربات",
-    "user": "📖 <b>راهنمای ربات</b>\n\n/war — وضعیت وار معمولی\n/cwl — وضعیت لیگ کلن‌ها\n/clan — اطلاعات کلن\n/link #TAG — لینک اکانت کلش\n/unlink #TAG — حذف لینک\n/myaccounts — اکانت‌های لینک‌شده\n/report — گزارش ماهانه کلن\n/setting — تنظیمات زبان و اعلان‌ها\n/help — همین راهنما",
-    "owner": "📖 <b>راهنمای مالک ربات</b>\n\nهمه دستورات کاربر:\n/war /cwl /clan /report /link /unlink /myaccounts /setting\n\nدستورات مالک:\n/status — وضعیت فنی ربات\n/maintenance — حالت تعمیرات (خاموش کردن مانیتور)\n/testnotify — تست اعلان گروه\n/testlog — تست کانال لاگ\n/testw — پیش‌نمایش ویجت\n/link TELEGRAM_ID #TAG — لینک برای دیگران\n/unlinkall — حذف همه لینک‌های خودتان\n\n/help — همین راهنما"
+    "user": "📖 <b>راهنمای ربات</b>\n\n/war — وضعیت وار معمولی\n/cwl — وضعیت لیگ کلن‌ها\n/clan — اطلاعات کلن\n/capital — وضعیت پایتخت\n/raid — Raid Weekend\n/link #TAG — لینک اکانت کلش\n/unlink #TAG — حذف لینک\n/myaccounts — اکانت‌های لینک‌شده\n/report — گزارش ماهانه کلن\n/setting — تنظیمات زبان و اعلان‌ها\n/help — همین راهنما",
+    "owner": "📖 <b>راهنمای مالک ربات</b>\n\nهمه دستورات کاربر:\n/war /cwl /clan /capital /raid /report /link /unlink /myaccounts /setting\n\nدستورات مالک:\n/status — وضعیت فنی ربات\n/maintenance — حالت تعمیرات\n/testnotify — تست اعلان گروه\n/testlog — تست کانال لاگ\n/testw — پیش‌نمایش ویجت\n/link TELEGRAM_ID #TAG — لینک برای دیگران\n/unlinkall — حذف همه لینک‌های خودتان\n\n/help — همین راهنما"
   },
   "maintenance": {
     "owner_only": "⛔️ این دستور فقط برای مالک ربات است.",
@@ -111,16 +111,21 @@
     "title": "⚙️ تنظیمات",
     "language": "🌐 زبان",
     "saved": "✅ زبان ذخیره شد.",
-    "notif_menu_title": "🔔 تنظیمات اعلان‌های گروه\n\nنوع جنگ را انتخاب کنید:",
+    "notif_menu_title": "🔔 تنظیمات اعلان‌های گروه\n\nنوع را انتخاب کنید:",
     "notif_war": "⚔️ وار معمولی",
     "notif_cwl": "🏟 لیگ کلن‌ها (CWL)",
+    "notif_capital": "🏛 پایتخت / Raid",
     "notif_war_title": "⚔️ اعلان‌های وار معمولی\n\nروی هر مورد بزنید تا روشن/خاموش شود:",
     "notif_cwl_title": "🏟 اعلان‌های لیگ کلن‌ها\n\nروی هر مورد بزنید تا روشن/خاموش شود:",
+    "notif_capital_title": "🏛 اعلان‌های پایتخت\n\nروی هر مورد بزنید تا روشن/خاموش شود:",
     "notif_key_preparation": "آماده‌سازی / پیدا شدن حریف",
     "notif_key_battle_start": "شروع جنگ",
     "notif_key_one_hour_left": "۱ ساعت باقی‌مانده",
     "notif_key_war_ended": "پایان جنگ",
     "notif_key_attack": "حمله جدید (پیش‌فرض خاموش)",
+    "notif_key_raid_start": "شروع Raid Weekend",
+    "notif_key_raid_ended": "پایان Raid Weekend",
+    "notif_key_reminder": "یادآوری حمله نزدن‌ها",
     "notif_enabled": "✅ روشن شد",
     "notif_disabled": "❌ خاموش شد"
   },
@@ -260,12 +265,16 @@
     "war": "⏳ در حال دریافت وضعیت وار...",
     "cwl": "⏳ در حال دریافت وضعیت CWL...",
     "clan": "⏳ در حال دریافت اطلاعات کلن...",
+    "capital": "⏳ در حال دریافت وضعیت پایتخت...",
+    "raid": "⏳ در حال دریافت وضعیت Raid...",
     "report": "⏳ در حال ساخت گزارش ماهانه..."
   },
   "rate": {
     "war": "⏳ تعداد درخواست‌های /war زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید.",
     "cwl": "⏳ تعداد درخواست‌های /cwl زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید.",
-    "clan": "⏳ تعداد درخواست‌های /clan زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید."
+    "clan": "⏳ تعداد درخواست‌های /clan زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید.",
+    "capital": "⏳ تعداد درخواست‌های /capital زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید.",
+    "raid": "⏳ تعداد درخواست‌های /raid زیاد است.\nلطفاً حدود <b>{{sec}}</b> ثانیه دیگر تلاش کنید."
   },
   "lang": {
     "name": {
