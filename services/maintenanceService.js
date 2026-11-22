@@ -1,5 +1,9 @@
 const { readState, writeState } = require('./maintenanceStore');
 const { stopWarMonitor, startWarMonitor } = require('./warMonitor');
+const {
+  stopCapitalMonitor,
+  startCapitalMonitor,
+} = require('./capitalMonitor');
 const { tgLog } = require('../utils/telegramLogger');
 
 /** @type {import('telegraf').Telegraf | null} */
@@ -54,6 +58,33 @@ function scheduleAutoOff() {
   }, Math.min(delay, maxDelay));
 }
 
+function stopAllMonitors() {
+  try {
+    stopWarMonitor();
+  } catch (err) {
+    console.warn('[Maintenance] stopWarMonitor:', err.message);
+  }
+  try {
+    stopCapitalMonitor();
+  } catch (err) {
+    console.warn('[Maintenance] stopCapitalMonitor:', err.message);
+  }
+}
+
+function startAllMonitors() {
+  if (!botRef) return;
+  try {
+    startWarMonitor(botRef);
+  } catch (err) {
+    console.warn('[Maintenance] startWarMonitor:', err.message);
+  }
+  try {
+    startCapitalMonitor(botRef);
+  } catch (err) {
+    console.warn('[Maintenance] startCapitalMonitor:', err.message);
+  }
+}
+
 async function enable({ reason = null, endsAt = null, updatedBy = null } = {}) {
   const next = writeState({
     enabled: true,
@@ -63,12 +94,7 @@ async function enable({ reason = null, endsAt = null, updatedBy = null } = {}) {
     updatedBy,
   });
 
-  try {
-    stopWarMonitor();
-  } catch (err) {
-    console.warn('[Maintenance] stopWarMonitor:', err.message);
-  }
-
+  stopAllMonitors();
   scheduleAutoOff();
 
   try {
@@ -96,13 +122,7 @@ async function disable({ silent = false, source = 'manual', updatedBy = null } =
     updatedBy,
   });
 
-  if (botRef) {
-    try {
-      startWarMonitor(botRef);
-    } catch (err) {
-      console.warn('[Maintenance] startWarMonitor:', err.message);
-    }
-  }
+  startAllMonitors();
 
   if (!silent) {
     try {
@@ -120,9 +140,7 @@ async function disable({ silent = false, source = 'manual', updatedBy = null } =
 function initFromDisk() {
   const state = readState();
   if (state.enabled) {
-    try {
-      stopWarMonitor();
-    } catch (_) {}
+    stopAllMonitors();
     scheduleAutoOff();
   }
   return state;
