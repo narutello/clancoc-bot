@@ -50,8 +50,8 @@
   },
   "help": {
     "public": "📖 Bot help",
-    "user": "📖 <b>Bot help</b>\n\n/war — Regular war status\n/cwl — CWL status\n/clan — Clan info\n/link #TAG — Link a Clash account\n/unlink #TAG — Unlink an account\n/myaccounts — Your linked accounts\n/report — Monthly clan report\n/setting — Language & notification settings\n/help — This help",
-    "owner": "📖 <b>Owner help</b>\n\nAll user commands:\n/war /cwl /clan /report /link /unlink /myaccounts /setting\n\nOwner commands:\n/status — Technical status\n/maintenance — Maintenance mode (stops monitor)\n/testnotify — Test group notification\n/testlog — Test log channel\n/testw — Widget preview\n/link TELEGRAM_ID #TAG — Link for someone else\n/unlinkall — Remove all your links\n\n/help — This help"
+    "user": "📖 <b>Bot help</b>\n\n/war — Regular war status\n/cwl — CWL status\n/clan — Clan info\n/capital — Clan Capital status\n/raid — Raid Weekend status\n/link #TAG — Link a Clash account\n/unlink #TAG — Unlink an account\n/myaccounts — Your linked accounts\n/report — Monthly clan report\n/setting — Language & notification settings\n/help — This help",
+    "owner": "📖 <b>Owner help</b>\n\nAll user commands:\n/war /cwl /clan /capital /raid /report /link /unlink /myaccounts /setting\n\nOwner commands:\n/status — Technical status\n/maintenance — Maintenance mode (stops monitor)\n/testnotify — Test group notification\n/testlog — Test log channel\n/testw — Widget preview\n/link TELEGRAM_ID #TAG — Link for someone else\n/unlinkall — Remove all your links\n\n/help — This help"
   },
   "maintenance": {
     "owner_only": "⛔️ Owner only.",
@@ -111,16 +111,21 @@
     "title": "⚙️ Settings",
     "language": "🌐 Language",
     "saved": "✅ Language saved.",
-    "notif_menu_title": "🔔 Group notification settings\n\nChoose a war type:",
+    "notif_menu_title": "🔔 Group notification settings\n\nChoose a type:",
     "notif_war": "⚔️ Regular war",
     "notif_cwl": "🏟 Clan War League (CWL)",
+    "notif_capital": "🏛 Capital / Raid",
     "notif_war_title": "⚔️ Regular war notifications\n\nTap an item to toggle on/off:",
     "notif_cwl_title": "🏟 CWL notifications\n\nTap an item to toggle on/off:",
+    "notif_capital_title": "🏛 Capital notifications\n\nTap an item to toggle on/off:",
     "notif_key_preparation": "Preparation / opponent found",
     "notif_key_battle_start": "Battle start",
     "notif_key_one_hour_left": "1 hour left",
     "notif_key_war_ended": "War ended",
     "notif_key_attack": "New attack (default off)",
+    "notif_key_raid_start": "Raid Weekend start",
+    "notif_key_raid_ended": "Raid Weekend end",
+    "notif_key_reminder": "Missing attacks reminder",
     "notif_enabled": "✅ Enabled",
     "notif_disabled": "❌ Disabled"
   },
@@ -260,12 +265,16 @@
     "war": "⏳ Loading war status...",
     "cwl": "⏳ Loading CWL status...",
     "clan": "⏳ Loading clan info...",
+    "capital": "⏳ Loading capital status...",
+    "raid": "⏳ Loading raid status...",
     "report": "⏳ Building monthly report..."
   },
   "rate": {
     "war": "⏳ Too many /war requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
-    "cwl": "⏳ Too many /cwl requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
-    "clan": "⏳ Too many /clan requests.\nPlease try again in about <b>{{sec}}</b> seconds."
+    "cwl": "⏳ Too many /cwl requests.\nPlease cont again in about <b>{{sec}}</b> seconds.",
+    "clan": "⏳ Too many /clan requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
+    "capital": "⏳ Too many /capital requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
+    "raid": "⏳ Too many /raid requests.\nPlease try again in about <b>{{sec}}</b> seconds."
   },
   "lang": {
     "name": {
