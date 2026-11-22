@@ -145,6 +145,12 @@ async function getPlayer(tag) {
   return request(`/players/${encodeTag(tag)}`);
 }
 
+/** Clan Capital raid seasons (Raid Weekend history + current). */
+async function getCapitalRaidSeasons(tag = config.clanTag, limit = 2) {
+  const q = limit != null ? `?limit=${Number(limit) || 2}` : '';
+  return request(`/clans/${encodeTag(tag)}/capitalraidseasons${q}`);
+}
+
 /**
  * Verify in-game player API token (short code from Settings → API Token).
  * Official endpoint: POST /players/{tag}/verifytoken
@@ -198,6 +204,7 @@ module.exports = {
   getCurrentWarLeagueGroup,
   getCwlWar,
   getPlayer,
+  getCapitalRaidSeasons,
   verifyPlayerWithToken,
   encodeTag,
   isMaintenanceResponse,

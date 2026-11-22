@@ -21,6 +21,11 @@ const DEFAULT_NOTIFY = {
     war_ended: true,
     attack: false,
   },
+  capital: {
+    raid_start: true,
+    raid_ended: true,
+    reminder: true,
+  },
 };
 
 const NOTIFY_KEYS = [
@@ -31,14 +36,25 @@ const NOTIFY_KEYS = [
   'attack',
 ];
 
+const CAPITAL_NOTIFY_KEYS = ['raid_start', 'raid_ended', 'reminder'];
+
 function mergeNotify(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
-  const out = { war: { ...DEFAULT_NOTIFY.war }, cwl: { ...DEFAULT_NOTIFY.cwl } };
+  const out = {
+    war: { ...DEFAULT_NOTIFY.war },
+    cwl: { ...DEFAULT_NOTIFY.cwl },
+    capital: { ...DEFAULT_NOTIFY.capital },
+  };
   for (const scope of ['war', 'cwl']) {
     const block = src[scope] && typeof src[scope] === 'object' ? src[scope] : {};
     for (const key of NOTIFY_KEYS) {
       if (typeof block[key] === 'boolean') out[scope][key] = block[key];
     }
+  }
+  const cap =
+    src.capital && typeof src.capital === 'object' ? src.capital : {};
+  for (const key of CAPITAL_NOTIFY_KEYS) {
+    if (typeof cap[key] === 'boolean') out.capital[key] = cap[key];
   }
   return out;
 }
@@ -78,17 +94,28 @@ async function getNotifySettings(chatId) {
   return mergeNotify(json.notify);
 }
 
+function resolveNotifyScope(scope) {
+  if (scope === 'cwl') return 'cwl';
+  if (scope === 'capital') return 'capital';
+  return 'war';
+}
+
 async function isNotifyEnabled(chatId, scope, key) {
-  const s = scope === 'cwl' ? 'cwl' : 'war';
-  const k = NOTIFY_KEYS.includes(key) ? key : null;
-  if (!k) return true;
+  const s = resolveNotifyScope(scope);
   const settings = await getNotifySettings(chatId);
-  return Boolean(settings[s][k]);
+  if (s === 'capital') {
+    if (!CAPITAL_NOTIFY_KEYS.includes(key)) return true;
+    return Boolean(settings.capital[key]);
+  }
+  if (!NOTIFY_KEYS.includes(key)) return true;
+  return Boolean(settings[s][key]);
 }
 
 async function toggleNotifySetting(chatId, scope, key) {
-  const s = scope === 'cwl' ? 'cwl' : 'war';
-  if (!NOTIFY_KEYS.includes(key)) {
+  const s = resolveNotifyScope(scope);
+  const allowed =
+    s === 'capital' ? CAPITAL_NOTIFY_KEYS : NOTIFY_KEYS;
+  if (!allowed.includes(key)) {
     throw new Error(`Unknown notify key: ${key}`);
   }
 
@@ -160,6 +187,7 @@ async function resolveLangForCtx(ctx) {
 module.exports = {
   DEFAULT_NOTIFY,
   NOTIFY_KEYS,
+  CAPITAL_NOTIFY_KEYS,
   getChatLanguage,
   setChatLanguage,
   getNotifySettings,
