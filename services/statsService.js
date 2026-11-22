@@ -20,9 +20,17 @@ const { tgLog } = require('../utils/telegramLogger');
 
 const SNAPSHOT_MIN_GAP_MS = 20 * 60 * 60 * 1000;
 const RETENTION_MIN_GAP_MS = 24 * 60 * 60 * 1000;
+/** Independent of war poll — keeps Neon quieter while staying inside monthly windows. */
+const STATS_MAINTENANCE_INTERVAL_MS = 45 * 60 * 1000;
+const STATS_MAINTENANCE_FIRST_DELAY_MS = 60 * 1000;
 
 let lastSnapshotAt = 0;
 let lastRetentionAt = 0;
+
+let statsTimer = null;
+let statsStopped = true;
+let statsRunning = false;
+let statsBot = null;
 
 function tehranParts(date = new Date()) {
   const fmt = new Intl.DateTimeFormat('en-CA', {
@@ -378,7 +386,7 @@ async function getDonationLeaders(monthKey, limit = 5) {
   const byDonated = [...list].sort((a, b) => b.donated - a.donated).slice(0, limit);
   const byReceived = [...list]
     .sort((a, b) => b.received - a.received)
-    .slice(0, limit);
+    .slice(0, 5);
   return { byDonated, byReceived, samplePlayers: byTag.size };
 }
 
@@ -543,6 +551,55 @@ async function runStatsMaintenance(bot) {
   }
 }
 
+function scheduleStatsMaintenance(delayMs) {
+  if (statsStopped) return;
+  if (statsTimer) clearTimeout(statsTimer);
+  statsTimer = setTimeout(async () => {
+    statsTimer = null;
+    if (statsStopped) return;
+
+    if (statsRunning) {
+      console.warn('[Stats] maintenance already running — skip this tick');
+      scheduleStatsMaintenance(STATS_MAINTENANCE_INTERVAL_MS);
+      return;
+    }
+
+    statsRunning = true;
+    try {
+      await runStatsMaintenance(statsBot);
+    } catch (err) {
+      // Never stop the scheduler permanently on error
+      console.warn('[Stats] maintenance tick failed:', err.message);
+    } finally {
+      statsRunning = false;
+      scheduleStatsMaintenance(STATS_MAINTENANCE_INTERVAL_MS);
+    }
+  }, delayMs);
+}
+
+/**
+ * Independent of war polling. Safe to call multiple times (rebinds bot).
+ * Stopped together with war monitor (maintenance / shutdown).
+ */
+function startStatsMaintenance(bot) {
+  statsBot = bot;
+  statsStopped = false;
+  if (statsTimer) return;
+  console.log(
+    `[Stats] maintenance scheduler started (first in ${STATS_MAINTENANCE_FIRST_DELAY_MS}ms, then every ${STATS_MAINTENANCE_INTERVAL_MS}ms)`
+  );
+  scheduleStatsMaintenance(STATS_MAINTENANCE_FIRST_DELAY_MS);
+}
+
+function stopStatsMaintenance() {
+  statsStopped = true;
+  if (statsTimer) {
+    clearTimeout(statsTimer);
+    statsTimer = null;
+  }
+  // Do not force-clear statsRunning mid-flight; tick will exit and not reschedule if stopped
+}
+
 module.exports = {
   monthKeyFromDate,
   parseMonthArg,
@@ -554,4 +611,6 @@ module.exports = {
   runRetention,
   maybeAnnouncePreviousMonth,
   runStatsMaintenance,
+  startStatsMaintenance,
+  stopStatsMaintenance,
 };

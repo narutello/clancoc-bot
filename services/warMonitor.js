@@ -34,7 +34,8 @@ const {
 const {
   recordFinishedWar,
   recordFinishedWarFromSaved,
-  runStatsMaintenance,
+  startStatsMaintenance,
+  stopStatsMaintenance,
 } = require('./statsService');
 const { isNotifyEnabled } = require('./settingsService');
 
@@ -329,7 +330,6 @@ async function checkCwl(bot, stateRef) {
     state: war.state,
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
-   
     teamSize: war.teamSize,
     preparationStart: war.preparationStartTime
       ? parseClashTime(war.preparationStartTime)
@@ -374,11 +374,7 @@ async function checkWarStatus(bot) {
       dbQueries,
     });
 
-    try {
-      await runStatsMaintenance(bot);
-    } catch (err) {
-      console.warn('[WarMonitor] stats maintenance:', err.message);
-    }
+    // Stats maintenance runs on its own timer (startStatsMaintenance).
 
     console.log(`[WarMonitor] Check done — state=${state} opponent=${opp}`);
     await tgLog.debug(
@@ -438,12 +434,14 @@ function startWarMonitor(bot) {
   monitorStopped = false;
   console.log('[WarMonitor] Starting adaptive war monitor...');
   scheduleNext(bot, 3000);
+  startStatsMaintenance(bot);
 }
 
 function stopWarMonitor() {
   monitorStopped = true;
   if (monitorTimer) clearTimeout(monitorTimer);
   monitorTimer = null;
+  stopStatsMaintenance();
 }
 
 module.exports = {
