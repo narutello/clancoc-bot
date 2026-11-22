@@ -271,7 +271,7 @@
   },
   "rate": {
     "war": "⏳ Too many /war requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
-    "cwl": "⏳ Too many /cwl requests.\nPlease cont again in about <b>{{sec}}</b> seconds.",
+    "cwl": "⏳ Too many /cwl requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
     "clan": "⏳ Too many /clan requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
     "capital": "⏳ Too many /capital requests.\nPlease try again in about <b>{{sec}}</b> seconds.",
     "raid": "⏳ Too many /raid requests.\nPlease try again in about <b>{{sec}}</b> seconds."
