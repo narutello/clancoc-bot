@@ -14,14 +14,20 @@ const config = require('../config');
 const { withTelegramRetry } = require('../utils/telegramSafe');
 const { t, isRtl, DEFAULT_LANG } = require('../utils/i18n');
 
+/** Telegram Bot API button styles: primary (blue), success (green), danger (red). */
 function keyboardOur(prefix, lang = DEFAULT_LANG) {
   const row = [
-    { text: t('war.btn_enemy', { lng: lang }), callback_data: `${prefix}:enemy` },
+    {
+      text: t('war.btn_enemy', { lng: lang }),
+      callback_data: `${prefix}:enemy`,
+      style: 'primary',
+    },
   ];
   if (prefix === 'cwl') {
     row.push({
       text: t('war.btn_standings', { lng: lang }),
       callback_data: 'cwl:standings',
+      style: 'primary',
     });
   }
   return { inline_keyboard: [row] };
@@ -30,7 +36,13 @@ function keyboardOur(prefix, lang = DEFAULT_LANG) {
 function keyboardEnemy(prefix, lang = DEFAULT_LANG) {
   return {
     inline_keyboard: [
-      [{ text: t('war.btn_back', { lng: lang }), callback_data: `${prefix}:home` }],
+      [
+        {
+          text: t('war.btn_back', { lng: lang }),
+          callback_data: `${prefix}:home`,
+          style: 'primary',
+        },
+      ],
     ],
   };
 }
@@ -38,7 +50,13 @@ function keyboardEnemy(prefix, lang = DEFAULT_LANG) {
 function keyboardStandings(lang = DEFAULT_LANG) {
   return {
     inline_keyboard: [
-      [{ text: t('war.btn_back', { lng: lang }), callback_data: 'cwl:home' }],
+      [
+        {
+          text: t('war.btn_back', { lng: lang }),
+          callback_data: 'cwl:home',
+          style: 'primary',
+        },
+      ],
     ],
   };
 }
