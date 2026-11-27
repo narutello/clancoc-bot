@@ -58,6 +58,11 @@ async function getLeagueGroupCached() {
   });
 }
 
+/**
+ * Resolve our CWL war.
+ * Important: while day N is inWar, day N+1 is often already in preparation.
+ * Never return preparation if any of our wars is still inWar.
+ */
 async function findOurCwlWarUncached() {
   let group;
   try {
@@ -77,9 +82,10 @@ async function findOurCwlWarUncached() {
       ? String(group.season)
       : `clan_${ourTag}_${totalDays}`;
 
+  let prepResult = null;
   let endedFallback = null;
 
-  // Newest day first — current CWL day is almost always the latest active round
+  // Newest day first for prep/ended fallbacks; still scan older days for inWar.
   for (let i = rounds.length - 1; i >= 0; i--) {
     const day = i + 1;
     const warTags = rounds[i].warTags || [];
@@ -110,8 +116,14 @@ async function findOurCwlWarUncached() {
           groupState: group.state || null,
         };
 
-        if (war.state === 'preparation' || war.state === 'inWar') {
+        // Active battle always wins over next-day preparation
+        if (war.state === 'inWar') {
           return result;
+        }
+
+        if (war.state === 'preparation') {
+          if (!prepResult) prepResult = result;
+          continue;
         }
 
         if (war.state === 'warEnded') {
@@ -125,7 +137,7 @@ async function findOurCwlWarUncached() {
     }
   }
 
-  return endedFallback;
+  return prepResult || endedFallback;
 }
 
 /**
