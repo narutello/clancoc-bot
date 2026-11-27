@@ -502,21 +502,21 @@ async function maybeAnnouncePreviousMonth(bot, sendToGroup) {
     return { skipped: true, reason: 'already' };
   }
 
-  const report = await buildMonthlyReport(prev);
-  if (!report.wars && report.donations.samplePlayers === 0) {
-    // Keep the claim so we don't retry an empty month forever
-    return { skipped: true, reason: 'empty' };
-  }
-
-  const { groupLang } = require('./warNotify');
-  const lang = await groupLang();
-  const text = formatReportText(report, lang);
-  const html = `<h2>${t('report.auto_title', {
-    lng: lang,
-    month: prev,
-  })}</h2><p>${text.replace(/\n/g, '<br/>')}</p>`;
-
   try {
+    const report = await buildMonthlyReport(prev);
+    if (!report.wars && report.donations.samplePlayers === 0) {
+      // Keep the claim so we don't retry an empty month forever
+      return { skipped: true, reason: 'empty' };
+    }
+
+    const { groupLang } = require('./warNotify');
+    const lang = await groupLang();
+    const text = formatReportText(report, lang);
+    const html = `<h2>${t('report.auto_title', {
+      lng: lang,
+      month: prev,
+    })}</h2><p>${text.replace(/\n/g, '<br/>')}</p>`;
+
     let sent = false;
     if (typeof sendToGroup === 'function') {
       sent = await sendToGroup(bot, html, lang);
@@ -533,6 +533,7 @@ async function maybeAnnouncePreviousMonth(bot, sendToGroup) {
     return { skipped: false, monthKey: prev };
   } catch (err) {
     console.error('[Stats] monthly announce failed:', err.message);
+    // Allow a later tick to retry after build/send errors
     try {
       await releaseNotification(key, event);
     } catch (_) {}
