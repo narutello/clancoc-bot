@@ -40,9 +40,9 @@ CREATE TABLE IF NOT EXISTS war_notifications (
 
 CREATE INDEX IF NOT EXISTS idx_war_notifications_war_key ON war_notifications(war_key);
 
--- Last known war state for comparison
+-- Last known war state: id 1 = regular, id 2 = CWL
 CREATE TABLE IF NOT EXISTS war_state (
-  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  id INTEGER PRIMARY KEY,
   state TEXT,
   war_tag TEXT,
   opponent_tag TEXT,
@@ -60,7 +60,10 @@ CREATE TABLE IF NOT EXISTS war_state (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO war_state (id, state) VALUES (1, 'unknown')
+INSERT INTO war_state (id, state, is_cwl) VALUES (1, 'unknown', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO war_state (id, state, is_cwl) VALUES (2, 'unknown', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Per-group settings (language, future options)
@@ -132,10 +135,38 @@ CREATE INDEX IF NOT EXISTS idx_member_snapshots_at ON member_snapshots(snapshot_
 CREATE INDEX IF NOT EXISTS idx_member_snapshots_player_at ON member_snapshots(player_tag, snapshot_at);
 `;
 
+/** Existing DBs may still have CHECK (id = 1); open slot 2 for CWL. */
+const WAR_STATE_DUAL_SLOT = `
+DO $$
+DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN (
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    JOIN pg_namespace n ON t.relnamespace = n.oid
+    WHERE t.relname = 'war_state'
+      AND n.nspname = current_schema()
+      AND c.contype = 'c'
+  ) LOOP
+    EXECUTE format('ALTER TABLE war_state DROP CONSTRAINT IF EXISTS %I', r.conname);
+  END LOOP;
+END $$;
+
+ALTER TABLE war_state DROP CONSTRAINT IF EXISTS war_state_id_slot;
+ALTER TABLE war_state
+  ADD CONSTRAINT war_state_id_slot CHECK (id IN (1, 2));
+
+INSERT INTO war_state (id, state, is_cwl) VALUES (2, 'unknown', true)
+ON CONFLICT (id) DO NOTHING;
+`;
+
 async function migrate({ closePool = false } = {}) {
   console.log('[DB] Running migrations...');
   try {
     await query(SCHEMA);
+    await query(WAR_STATE_DUAL_SLOT);
     console.log('[DB] Migrations completed successfully.');
   } catch (err) {
     console.error('[DB] Migration failed:', err.message);
