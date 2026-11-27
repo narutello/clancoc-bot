@@ -4,6 +4,7 @@ const {
   escapeHtml,
   parseClashTime,
   formatTag,
+  normalizeTag,
   tgUserLink,
   formatWarTime,
 } = require('../utils/helpers');
@@ -108,13 +109,19 @@ ${endLine}
 ${extra}`.trim();
 }
 
+function linksForMember(linksMap, tag) {
+  const key = normalizeTag(tag);
+  if (!key) return [];
+  return linksMap.get(key) || [];
+}
+
 async function buildTopMembersHtml(members, lang, limit = 8) {
   const sorted = sortMembersByLoot(members).slice(0, limit);
   if (sorted.length === 0) {
     return `<p>${t('capital.no_members', { lng: lang })}</p>`;
   }
 
-  const tags = sorted.map((m) => m.tag).filter(Boolean);
+  const tags = sorted.map((m) => normalizeTag(m.tag)).filter(Boolean);
   let linksMap = new Map();
   try {
     linksMap = await getLinksForTags(tags);
@@ -122,7 +129,7 @@ async function buildTopMembersHtml(members, lang, limit = 8) {
 
   const lines = sorted.map((m, i) => {
     let name = escapeHtml(m.name || formatTag(m.tag) || '—');
-    const links = linksMap.get(m.tag) || [];
+    const links = linksForMember(linksMap, m.tag);
     if (links.length > 0) {
       name = links
         .map((u) => tgUserLink(u.telegram_id, m.name || formatTag(m.tag)))
@@ -149,14 +156,14 @@ async function buildPendingHtml(members, lang) {
     return `<p>${t('capital.all_attacked', { lng: lang })}</p>`;
   }
 
-  const tags = pending.map((m) => m.tag).filter(Boolean);
+  const tags = pending.map((m) => normalizeTag(m.tag)).filter(Boolean);
   let linksMap = new Map();
   try {
     linksMap = await getLinksForTags(tags);
   } catch (_) {}
 
   const names = pending.slice(0, 25).map((m) => {
-    const links = linksMap.get(m.tag) || [];
+    const links = linksForMember(linksMap, m.tag);
     if (links.length > 0) {
       return links
         .map((u) => tgUserLink(u.telegram_id, m.name || formatTag(m.tag)))
