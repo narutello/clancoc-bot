@@ -7,6 +7,11 @@ const config = require('../config');
 const { getCache, setCache } = require('../utils/ttlCache');
 const { singleflight } = require('../utils/singleflight');
 
+/** Short TTL — monitor polls ~30s near transitions; stay under that. */
+const FIND_TTL_MS = config.cwlFindCacheTtlMs || 25 * 1000;
+const WAR_TTL_MS = config.cwlWarCacheTtlMs || 20 * 1000;
+const GROUP_TTL_MS = config.cwlGroupCacheTtlMs || 60 * 1000;
+
 async function fetchCwlWarSafe(warTag) {
   let lastErr;
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -24,10 +29,39 @@ async function fetchCwlWarSafe(warTag) {
   throw lastErr;
 }
 
-async function findOurCwlWar() {
+/** Cached CWL war body (per tag) to cut repeat polls. */
+async function fetchCwlWarCached(warTag) {
+  const key = `cwlWar:${normalizeTag(warTag) || warTag}`;
+  const hit = getCache(key);
+  if (hit !== null) return hit;
+
+  return singleflight(key, async () => {
+    const again = getCache(key);
+    if (again !== null) return again;
+    const war = await fetchCwlWarSafe(warTag);
+    setCache(key, war, WAR_TTL_MS);
+    return war;
+  });
+}
+
+async function getLeagueGroupCached() {
+  const key = `cwlGroup:${normalizeTag(config.clanTag)}`;
+  const hit = getCache(key);
+  if (hit !== null) return hit;
+
+  return singleflight(key, async () => {
+    const again = getCache(key);
+    if (again !== null) return again;
+    const group = await getCurrentWarLeagueGroup();
+    setCache(key, group, GROUP_TTL_MS);
+    return group;
+  });
+}
+
+async function findOurCwlWarUncached() {
   let group;
   try {
-    group = await getCurrentWarLeagueGroup();
+    group = await getLeagueGroupCached();
   } catch (err) {
     if (err.isNotFound || err.status === 404) return null;
     throw err;
@@ -45,7 +79,8 @@ async function findOurCwlWar() {
 
   let endedFallback = null;
 
-  for (let i = 0; i < rounds.length; i++) {
+  // Newest day first — current CWL day is almost always the latest active round
+  for (let i = rounds.length - 1; i >= 0; i--) {
     const day = i + 1;
     const warTags = rounds[i].warTags || [];
 
@@ -53,7 +88,7 @@ async function findOurCwlWar() {
       if (!warTag || warTag === '#0') continue;
 
       try {
-        const war = await fetchCwlWarSafe(warTag);
+        const war = await fetchCwlWarCached(warTag);
         const clanTag = normalizeTag(war.clan?.tag);
         const oppTag = normalizeTag(war.opponent?.tag);
         if (clanTag !== ourTag && oppTag !== ourTag) continue;
@@ -91,6 +126,28 @@ async function findOurCwlWar() {
   }
 
   return endedFallback;
+}
+
+/**
+ * Find our active (or latest ended) CWL war.
+ * Result is TTL-cached including null (not in CWL) via wrapper object.
+ */
+async function findOurCwlWar() {
+  const cacheKey = `findOurCwl:${normalizeTag(config.clanTag)}`;
+  const cached = getCache(cacheKey);
+  if (cached !== null && Object.prototype.hasOwnProperty.call(cached, 'result')) {
+    return cached.result;
+  }
+
+  return singleflight(cacheKey, async () => {
+    const again = getCache(cacheKey);
+    if (again !== null && Object.prototype.hasOwnProperty.call(again, 'result')) {
+      return again.result;
+    }
+    const result = await findOurCwlWarUncached();
+    setCache(cacheKey, { result }, FIND_TTL_MS);
+    return result;
+  });
 }
 
 async function isInCwl() {
@@ -148,7 +205,7 @@ function memberAttackStars(member) {
 async function computeCwlStandings() {
   let group;
   try {
-    group = await getCurrentWarLeagueGroup();
+    group = await getLeagueGroupCached();
   } catch (err) {
     if (err.isNotFound || err.status === 404) return null;
     throw err;
@@ -194,7 +251,7 @@ async function computeCwlStandings() {
   const concurrency = config.cwlStandingsConcurrency || 3;
   const wars = await mapPool(warTags, concurrency, async (warTag) => {
     try {
-      return await fetchCwlWarSafe(warTag);
+      return await fetchCwlWarCached(warTag);
     } catch {
       return null;
     }
