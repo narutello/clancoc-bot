@@ -2,6 +2,11 @@ const { query } = require('../database');
 const { parseClashTime, normalizeTag } = require('../utils/helpers');
 const { markSaveStateWrite, markSaveStateSkip } = require('./monitorStats');
 
+/** Slot ids: 1 = regular war, 2 = CWL day */
+function stateSlotId(isCwl) {
+  return isCwl ? 2 : 1;
+}
+
 async function hasNotification(warKey, eventType) {
   const res = await query(
     `SELECT 1 FROM war_notifications WHERE war_key = $1 AND event_type = $2`,
@@ -42,8 +47,12 @@ async function releaseNotification(warKey, eventType) {
   );
 }
 
-async function getLastState() {
-  const res = await query(`SELECT * FROM war_state WHERE id = 1`);
+/**
+ * @param {boolean} [isCwl=false] regular (id=1) vs CWL (id=2)
+ */
+async function getLastState(isCwl = false) {
+  const id = stateSlotId(isCwl);
+  const res = await query(`SELECT * FROM war_state WHERE id = $1`, [id]);
   return res.rows[0] || null;
 }
 
@@ -131,14 +140,37 @@ function shouldSaveWarState(last, data) {
 }
 
 async function saveState(data) {
+  const id = stateSlotId(Boolean(data.isCwl));
   await query(
-    `UPDATE war_state SET
-      state = $1, war_tag = $2, opponent_tag = $3, team_size = $4,
-      preparation_start = $5, start_time = $6, end_time = $7,
-      our_stars = $8, their_stars = $9, our_destruction = $10, their_destruction = $11,
-      members_json = $12, attacks_json = $13, is_cwl = $14, updated_at = NOW()
-     WHERE id = 1`,
+    `INSERT INTO war_state (
+      id, state, war_tag, opponent_tag, team_size,
+      preparation_start, start_time, end_time,
+      our_stars, their_stars, our_destruction, their_destruction,
+      members_json, attacks_json, is_cwl, updated_at
+    ) VALUES (
+      $1, $2, $3, $4, $5,
+      $6, $7, $8,
+      $9, $10, $11, $12,
+      $13, $14, $15, NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      state = EXCLUDED.state,
+      war_tag = EXCLUDED.war_tag,
+      opponent_tag = EXCLUDED.opponent_tag,
+      team_size = EXCLUDED.team_size,
+      preparation_start = EXCLUDED.preparation_start,
+      start_time = EXCLUDED.start_time,
+      end_time = EXCLUDED.end_time,
+      our_stars = EXCLUDED.our_stars,
+      their_stars = EXCLUDED.their_stars,
+      our_destruction = EXCLUDED.our_destruction,
+      their_destruction = EXCLUDED.their_destruction,
+      members_json = EXCLUDED.members_json,
+      attacks_json = EXCLUDED.attacks_json,
+      is_cwl = EXCLUDED.is_cwl,
+      updated_at = NOW()`,
     [
+      id,
       data.state,
       data.warTag || null,
       data.opponentTag || null,
@@ -152,7 +184,7 @@ async function saveState(data) {
       data.theirDestruction ?? null,
       data.membersJson ? JSON.stringify(data.membersJson) : null,
       data.attacksJson ? JSON.stringify(data.attacksJson) : null,
-      data.isCwl || false,
+      Boolean(data.isCwl),
     ]
   );
   markSaveStateWrite();
@@ -201,4 +233,5 @@ module.exports = {
   membersFingerprint,
   buildWarKey,
   buildWarKeyFromSaved,
+  stateSlotId,
 };
