@@ -183,6 +183,30 @@ async function persistSharedState(stateRef, payload) {
   return saved;
 }
 
+/**
+ * When CWL advances to a new day, findOurCwlWar returns the new active war and
+ * never surfaces the previous day's warEnded. Close out the saved day first.
+ */
+async function closePreviousCwlDayIfNeeded(bot, stateRef, warKey) {
+  const last = stateRef.last;
+  if (!last?.is_cwl) return;
+  if (!last.state || last.state === 'notInWar' || last.state === 'warEnded') return;
+
+  const lastKey = buildWarKeyFromSaved(last);
+  if (!lastKey || !warKey || lastKey === warKey) return;
+
+  console.log(
+    `[WarMonitor] CWL day transition — closing previous war (${lastKey} → ${warKey})`
+  );
+  await notifyWarEndedFromSaved(bot, last, true);
+  await recordFinishedWarFromSaved(last, true);
+  await tgLog.info(
+    'CWL previous day closed on transition',
+    { from: lastKey, to: warKey, lastState: last.state },
+    { module: 'WarMonitor' }
+  );
+}
+
 async function checkRegularWar(bot, stateRef) {
   const last = stateRef.last;
   let war;
@@ -272,19 +296,23 @@ async function checkCwl(bot, stateRef) {
   const warKey = buildWarKey(war);
   const lastKey = buildWarKeyFromSaved(last);
 
+  // Days 1–6: next day becomes active before we ever see warEnded of previous day
+  await closePreviousCwlDayIfNeeded(bot, stateRef, warKey);
+
   if (war.state === 'preparation') await notifyCwlLeagueStart(bot, war, meta);
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, true);
-    await maybeNotifyAttacks(bot, war, last, true);
+    // After day transition, last may still describe previous war — attack diff only same key
+    await maybeNotifyAttacks(bot, war, stateRef.last, true);
     await notifyOneHourLeft(bot, war, true);
   }
 
   if (war.state === 'warEnded') {
     const lastWasActive =
-      last &&
-      last.is_cwl &&
-      lastKey === warKey &&
-      (last.state === 'inWar' || last.state === 'preparation');
+      stateRef.last &&
+      stateRef.last.is_cwl &&
+      buildWarKeyFromSaved(stateRef.last) === warKey &&
+      (stateRef.last.state === 'inWar' || stateRef.last.state === 'preparation');
 
     const recentlyEnded = isRecentlyEnded(war);
 
@@ -293,15 +321,15 @@ async function checkCwl(bot, stateRef) {
       await recordFinishedWar(war, { isCwl: true });
     } else {
       console.log(
-        `[WarMonitor] Skip stale CWL warEnded notify (day ${meta.cwlDay}, last=${last?.state || 'none'}, is_cwl=${last?.is_cwl ? 1 : 0})`
+        `[WarMonitor] Skip stale CWL warEnded notify (day ${meta.cwlDay}, last=${stateRef.last?.state || 'none'}, is_cwl=${stateRef.last?.is_cwl ? 1 : 0})`
       );
       await recordFinishedWar(war, { isCwl: true });
       await tgLog.debug(
         'Skipped stale CWL warEnded notify',
         {
           day: meta.cwlDay,
-          lastState: last?.state || 'none',
-          lastIsCwl: Boolean(last?.is_cwl),
+          lastState: stateRef.last?.state || 'none',
+          lastIsCwl: Boolean(stateRef.last?.is_cwl),
         },
         { module: 'WarMonitor' }
       );
