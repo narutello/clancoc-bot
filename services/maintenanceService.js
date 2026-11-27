@@ -14,6 +14,9 @@ let autoOffTimer = null;
 /** @type {Map<number, { step: 'reason' | 'endsAt', reason: string | null }>} */
 const pending = new Map();
 
+/** Iran standard offset (no DST since 2022). */
+const TEHRAN_OFFSET = '+03:30';
+
 function setBot(bot) {
   botRef = bot;
 }
@@ -159,8 +162,9 @@ function clearPending(userId) {
 }
 
 /**
- * Parse relative durations like 30m, 2h, 1d or absolute ISO-ish datetime.
- * Returns ISO string or null.
+ * Parse relative durations like 30m, 2h, 1d or absolute datetime.
+ * Absolute times without timezone are treated as Asia/Tehran wall clock.
+ * Returns ISO string (UTC) or null.
  */
 function parseEndsAt(input) {
   if (!input || typeof input !== 'string') return null;
@@ -177,11 +181,27 @@ function parseEndsAt(input) {
     return new Date(Date.now() + n * mult).toISOString();
   }
 
-  // YYYY-MM-DD HH:mm or YYYY-MM-DDTHH:mm
+  // Explicit Z / offset → trust as written
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(s)) {
+    const d = new Date(s.includes(' ') ? s.replace(' ', 'T') : s);
+    if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) return null;
+    return d.toISOString();
+  }
+
+  // YYYY-MM-DD HH:mm[:ss] or with T — interpret as Tehran local
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s);
+  if (m) {
+    const sec = m[6] || '00';
+    const d = new Date(
+      `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${sec}${TEHRAN_OFFSET}`
+    );
+    if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) return null;
+    return d.toISOString();
+  }
+
   const normalized = s.replace(' ', 'T');
   const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return null;
-  if (d.getTime() <= Date.now()) return null;
+  if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) return null;
   return d.toISOString();
 }
 
