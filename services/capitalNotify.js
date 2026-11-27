@@ -151,7 +151,13 @@ ${lines.join('\n')}
 }
 
 async function buildPendingHtml(members, lang) {
-  const pending = (members || []).filter((m) => memberAttackCount(m) <= 0);
+  const list = members || [];
+  // Early raid weekend: API may return no member rows yet — do not claim "all attacked".
+  if (list.length === 0) {
+    return '';
+  }
+
+  const pending = list.filter((m) => memberAttackCount(m) <= 0);
   if (pending.length === 0) {
     return `<p>${t('capital.all_attacked', { lng: lang })}</p>`;
   }
