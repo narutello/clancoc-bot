@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS war_notifications (
 CREATE INDEX IF NOT EXISTS idx_war_notifications_war_key ON war_notifications(war_key);
 
 -- Last known war state: id 1 = regular, id 2 = CWL
+-- (CHECK constraint + slot 2 row applied in WAR_STATE_DUAL_SLOT after legacy cleanup)
 CREATE TABLE IF NOT EXISTS war_state (
   id INTEGER PRIMARY KEY,
   state TEXT,
@@ -61,9 +62,6 @@ CREATE TABLE IF NOT EXISTS war_state (
 );
 
 INSERT INTO war_state (id, state, is_cwl) VALUES (1, 'unknown', false)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO war_state (id, state, is_cwl) VALUES (2, 'unknown', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Per-group settings (language, future options)
@@ -135,8 +133,15 @@ CREATE INDEX IF NOT EXISTS idx_member_snapshots_at ON member_snapshots(snapshot_
 CREATE INDEX IF NOT EXISTS idx_member_snapshots_player_at ON member_snapshots(player_tag, snapshot_at);
 `;
 
-/** Existing DBs may still have CHECK (id = 1); open slot 2 for CWL. */
+/**
+ * Existing DBs still have CHECK (id = 1) as war_state_id_check.
+ * Drop all CHECK constraints on war_state, allow slots 1 and 2, insert CWL row.
+ * Must run AFTER base SCHEMA and BEFORE any INSERT of id=2.
+ */
 const WAR_STATE_DUAL_SLOT = `
+ALTER TABLE war_state DROP CONSTRAINT IF EXISTS war_state_id_check;
+ALTER TABLE war_state DROP CONSTRAINT IF EXISTS war_state_id_slot;
+
 DO $$
 DECLARE
   r RECORD;
@@ -154,9 +159,11 @@ BEGIN
   END LOOP;
 END $$;
 
-ALTER TABLE war_state DROP CONSTRAINT IF EXISTS war_state_id_slot;
 ALTER TABLE war_state
   ADD CONSTRAINT war_state_id_slot CHECK (id IN (1, 2));
+
+INSERT INTO war_state (id, state, is_cwl) VALUES (1, 'unknown', false)
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO war_state (id, state, is_cwl) VALUES (2, 'unknown', true)
 ON CONFLICT (id) DO NOTHING;
