@@ -1,8 +1,8 @@
-const { getCurrentWar } = require('../api/clash');
+const { getCurrentWar, getCwlWar } = require('../api/clash');
 const config = require('../config');
 const { resetQueryCount } = require('../database');
 const { tgLog } = require('../utils/telegramLogger');
-const { parseClashTime } = require('../utils/helpers');
+const { parseClashTime, normalizeTag } = require('../utils/helpers');
 const { findOurCwlWar } = require('./cwlService');
 const { notifyCwlLeagueEnded } = require('./cwlLeagueEnd');
 const {
@@ -134,10 +134,10 @@ async function maybeNotifyAttacks(bot, war, last, isCwl) {
   await notifyNewAttacks(bot, war, prevMembers || [], isCwl);
 }
 
-function notInWarPayload() {
+function notInWarPayload(isCwl = false) {
   return {
     state: 'notInWar',
-    isCwl: false,
+    isCwl: Boolean(isCwl),
     opponentTag: null,
     warTag: null,
     membersJson: null,
@@ -172,15 +172,63 @@ function toLastRowShape(data) {
 }
 
 /**
- * Persist only when changed; keep shared in-tick state in sync for the other path.
+ * Persist only when changed; keep in-tick state ref in sync for that slot.
  * @param {{ last: object|null }} stateRef
  */
-async function persistSharedState(stateRef, payload) {
+async function persistSlotState(stateRef, payload) {
   const saved = await saveStateIfChanged(stateRef.last, payload);
   if (saved) {
     stateRef.last = toLastRowShape(payload);
   }
   return saved;
+}
+
+/** Orient CWL war so war.clan is always our clan. */
+function orientCwlWar(war) {
+  if (!war) return war;
+  const ourTag = normalizeTag(config.clanTag);
+  const clanTag = normalizeTag(war.clan?.tag);
+  const oppTag = normalizeTag(war.opponent?.tag);
+  if (oppTag === ourTag && clanTag !== ourTag) {
+    const tmp = war.clan;
+    war.clan = war.opponent;
+    war.opponent = tmp;
+  }
+  return war;
+}
+
+/**
+ * Prefer a fresh API snapshot of the previous CWL day so late attacks are included.
+ * Falls back to saved state when war_tag is missing or the request fails.
+ */
+async function closeCwlDayFromSavedOrApi(bot, last) {
+  if (!last?.is_cwl) return;
+
+  const warTag = last.war_tag;
+  if (warTag) {
+    try {
+      let war = await getCwlWar(warTag);
+      war = orientCwlWar(war);
+      if (war && war.state && war.state !== 'notInWar') {
+        await notifyWarEnded(bot, war, true);
+        await recordFinishedWar(war, { isCwl: true });
+        await tgLog.info(
+          'CWL day closed from API snapshot',
+          { warTag: normalizeTag(warTag), state: war.state },
+          { module: 'WarMonitor' }
+        );
+        return;
+      }
+    } catch (err) {
+      console.warn(
+        '[WarMonitor] CWL final fetch failed, using saved state:',
+        err.message
+      );
+    }
+  }
+
+  await notifyWarEndedFromSaved(bot, last, true);
+  await recordFinishedWarFromSaved(last, true);
 }
 
 /**
@@ -198,8 +246,7 @@ async function closePreviousCwlDayIfNeeded(bot, stateRef, warKey) {
   console.log(
     `[WarMonitor] CWL day transition — closing previous war (${lastKey} → ${warKey})`
   );
-  await notifyWarEndedFromSaved(bot, last, true);
-  await recordFinishedWarFromSaved(last, true);
+  await closeCwlDayFromSavedOrApi(bot, last);
   await tgLog.info(
     'CWL previous day closed on transition',
     { from: lastKey, to: warKey, lastState: last.state },
@@ -218,13 +265,12 @@ async function checkRegularWar(bot, stateRef) {
   }
 
   if (!war || war.state === 'notInWar') {
-    if (last && !last.is_cwl && last.state && last.state !== 'notInWar') {
+    if (last && last.state && last.state !== 'notInWar') {
       await notifyWarEndedFromSaved(bot, last, false);
       await recordFinishedWarFromSaved(last, false);
-      await persistSharedState(stateRef, notInWarPayload());
-    } else if (!last?.is_cwl) {
-      // Idle notInWar: skip write when already stored as notInWar
-      await persistSharedState(stateRef, notInWarPayload());
+      await persistSlotState(stateRef, notInWarPayload(false));
+    } else {
+      await persistSlotState(stateRef, notInWarPayload(false));
     }
     return { state: 'notInWar', isCwl: false };
   }
@@ -240,7 +286,7 @@ async function checkRegularWar(bot, stateRef) {
     await notifyWarEnded(bot, war, false);
     await recordFinishedWar(war, { isCwl: false });
   }
-  await persistSharedState(stateRef, {
+  await persistSlotState(stateRef, {
     state: war.state,
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
@@ -279,8 +325,8 @@ async function checkCwl(bot, stateRef) {
       last.state !== 'notInWar' &&
       last.state !== 'warEnded'
     ) {
-      await notifyWarEndedFromSaved(bot, last, true);
-      await recordFinishedWarFromSaved(last, true);
+      await closeCwlDayFromSavedOrApi(bot, last);
+      await persistSlotState(stateRef, notInWarPayload(true));
     }
     return null;
   }
@@ -294,7 +340,6 @@ async function checkCwl(bot, stateRef) {
   war.__cwlMeta = meta;
 
   const warKey = buildWarKey(war);
-  const lastKey = buildWarKeyFromSaved(last);
 
   // Days 1–6: next day becomes active before we ever see warEnded of previous day
   await closePreviousCwlDayIfNeeded(bot, stateRef, warKey);
@@ -302,7 +347,6 @@ async function checkCwl(bot, stateRef) {
   if (war.state === 'preparation') await notifyCwlLeagueStart(bot, war, meta);
   if (war.state === 'inWar') {
     await notifyBattleStart(bot, war, true);
-    // After day transition, last may still describe previous war — attack diff only same key
     await maybeNotifyAttacks(bot, war, stateRef.last, true);
     await notifyOneHourLeft(bot, war, true);
   }
@@ -354,7 +398,7 @@ async function checkCwl(bot, stateRef) {
     });
   }
 
-  await persistSharedState(stateRef, {
+  await persistSlotState(stateRef, {
     state: war.state,
     warTag: war.tag || null,
     opponentTag: war.opponent?.tag,
@@ -378,11 +422,12 @@ async function checkWarStatus(bot) {
   markPollStart();
   resetQueryCount();
   try {
-    // One read per tick; both paths share and refresh this ref after writes.
-    const stateRef = { last: await getLastState() };
+    // Separate slots so CWL and regular war never overwrite each other.
+    const cwlRef = { last: await getLastState(true) };
+    const regularRef = { last: await getLastState(false) };
 
-    const cwlWar = await checkCwl(bot, stateRef);
-    const war = await checkRegularWar(bot, stateRef);
+    const cwlWar = await checkCwl(bot, cwlRef);
+    const war = await checkRegularWar(bot, regularRef);
     const active =
       cwlWar && cwlWar.state && cwlWar.state !== 'notInWar' ? cwlWar : war;
     lastActiveWar = active;
