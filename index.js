@@ -38,7 +38,7 @@ async function buildHealthPayload() {
   const uptimeSec = Math.floor((Date.now() - bootAt) / 1000);
   const maint = maintenance.getState();
 
-  // Bot process is healthy if Telegram is up; DB may be degraded
+  // Bot process is healthy if Telegram polling has started; DB may be degraded
   const ok = botReady;
 
   return {
@@ -99,7 +99,7 @@ function startHealthServer(port) {
         res.end(JSON.stringify(body));
       };
 
-      // Public minimal health — process up is enough for platform probes
+      // Public minimal health — ready once Telegram launch callback has fired
       if (method === 'GET' && (url === '/' || url === '/health')) {
         const ok = botReady;
         return json(ok ? 200 : 503, {
@@ -204,11 +204,12 @@ async function main() {
   tgLog.setBot(bot);
   maintenance.setBot(bot);
 
+  // Telegraf 4.11+: launch() promise stays pending while polling runs.
+  // Use the onLaunch callback so botReady /health can become 200.
   bot
-    .launch()
-    .then(() => {
+    .launch(() => {
       botReady = true;
-      console.log('[OK] Telegram bot started (launch resolved)');
+      console.log('[OK] Telegram bot started (launch callback)');
     })
     .catch((err) => {
       console.error('[FAIL] Bot launch failed:', err.message);
