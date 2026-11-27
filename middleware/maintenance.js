@@ -4,6 +4,7 @@ const {
   getState,
   formatEndsAt,
 } = require('../services/maintenanceService');
+const { escapeHtml } = require('../utils/helpers');
 
 function isOwner(userId) {
   return userId != null && Number(userId) === Number(config.ownerTelegramId);
@@ -13,7 +14,11 @@ function buildPublicMessage(ctx, state) {
   const lines = [ctx.t('maintenance.public_default')];
   if (state.reason) {
     lines.push('');
-    lines.push(ctx.t('maintenance.public_reason', { reason: state.reason }));
+    lines.push(
+      ctx.t('maintenance.public_reason', {
+        reason: escapeHtml(state.reason),
+      })
+    );
   }
   if (state.endsAt) {
     lines.push(
